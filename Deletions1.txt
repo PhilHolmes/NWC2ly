@@ -1,0 +1,37 @@
+﻿    if Cmd = 'DynamicVariance' then
+    begin
+      s1 := GetPar ('Style', Line);
+      if s1 = 'Crescendo' then
+      begin
+        Write ('\setTextCresc ');
+        LastCresc := 3;
+      end;
+      if s1 = 'Decrescendo' then
+      begin
+        Write ('\setTextCresc ');
+        LastCresc := -3;
+      end;
+      Last := '';
+    end;
+    if Cmd = 'Tempo' then
+    begin
+      s1 := GetPar ('Base', Line);
+      if s1 = 'Half' then s1 := '2';
+      if s1 = 'Half Dotted' then s1 := '2.';
+      if s1 = 'Quarter' then s1 := '4';
+      if s1 = 'Quarter Dotted' then s1 := '4.';
+      if s1 = 'Eighth' then s1 := '8';
+      if s1 = 'Eighth Dotted' then s1 := '8.';
+      if s1 = '' then s1 := '4';
+      WriteLn (' \tempo ' + s1 + '=' + GetPar ('Tempo', Line));
+      Last := '';
+    end;
+    if Cmd = 'TempoVariance' then
+    begin
+      s1 := GetPar ('Style', Line);
+      if s1 = 'Fermata' then
+        Fermata := TRUE;
+      if s1 = 'Ritenuto' then
+        NextText := '^\markup{\italic{ rit. }}' + NextText;
+      Last := '';
+    end;
