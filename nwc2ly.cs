@@ -631,7 +631,7 @@ namespace nwc2ly
 							}
 							else
 							{
-								WriteLn("% Unparsed text expression: " + Last);
+								WriteLn(" % Unparsed text expression: " + Last);
 							}
 						}
 						else if (Cmd == "PerformanceStyle")
@@ -702,12 +702,12 @@ namespace nwc2ly
 							}
 							else
 							{
-								WriteLn("% Unparsed Flow command: " + Last);
+								WriteLn(" % Unparsed Flow command: " + Last);
 							}
 						}
 						else
 						{
-							WriteLn("% Unparsed command: " + Last);
+							WriteLn(" % Unparsed command: " + Last);
 						}
 						if (Cmd == "Bar")
 						{
@@ -1406,23 +1406,38 @@ namespace nwc2ly
 
 		public static string GetCommand(ref string Line)
 		{
-			string result;
-			string s;
-			s = "";
-			if (Line == null || Line == "")
+			
+			string Command = "";
+			if (Line == null || Line == "") return "";
+			if (Line.IndexOf('|') == 0)
 			{
-			}
-			else if (Line[0] == '|')
-			{
-				Line = Line.Remove(0, 1);
-				do
+				int PipePos = Line.IndexOf('|', 1);
+				if (PipePos > 0)
 				{
-					s = s + Line[0];
-					Line = Line.Remove(0, 1);
-				} while (!((Line == "") || (Line[0] == '|')));
+					Command = Line.Substring(1, PipePos - 1);
+					Line = Line.Substring(PipePos);
+				}
+				else
+				{
+					Command = Line.Substring(1);
+					Line = "";
+				}
 			}
-			result = s;
-			return result;
+			if (Line.IndexOf("!NoteWorthyComposer") == 0)
+			{
+				if (Line.IndexOf("End") < 0)
+				{
+					Command = "Version";
+					int OpenPar = Line.IndexOf('(');
+					OpenPar++;
+					int ClosePar = Line.IndexOf(')');
+					if (OpenPar > 0 && ClosePar > OpenPar)
+					{
+						Line = Line.Substring(OpenPar, ClosePar - OpenPar);
+					}
+				}
+			}
+			return Command;
 		}
 
 		public static string GetPar(string ParName, string Line, bool All)
@@ -1441,7 +1456,7 @@ namespace nwc2ly
 			}
 			s = "";
 			i = Line.IndexOf(ParName + ':');
-			if (i > 0)
+			if (i > -1)
 			{
 				i = i + 1 + ParName.Length;
 				while ((i < Line.Length) && (!(Stop.IndexOf(Line[i]) >= 0)))
