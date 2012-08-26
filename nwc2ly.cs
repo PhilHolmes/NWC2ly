@@ -394,7 +394,8 @@ namespace nwc2ly
 						{
 							if (InBeam)
 							{
-								WriteLn("  % Prematurely ending beam which spans voices.  To correct this, use layering in Noteworthy");
+								WriteLn("  % Error");
+								WriteLn("#(ly:warning \"Prematurely ending beam which spans voices.  To correct this, use layering in Noteworthy\")");
 								Write("]");
 								InBeam = false;
 							}
@@ -412,7 +413,8 @@ namespace nwc2ly
 							CountBars = false;
 							if (InBeam)
 							{
-								WriteLn("  % Prematurely ending beam which spans voices.  To correct this, use layering in Noteworthy");
+								WriteLn("  % Error");
+								WriteLn("#(ly:warning \"Prematurely ending beam which spans voices.  To correct this, use layering in Noteworthy\")");
 								Write("]");
 								InBeam = false;
 							}
@@ -430,14 +432,15 @@ namespace nwc2ly
 							CountBars = true;
 							if (InBeam)
 							{
-								WriteLn("% Prematurely ending beam which spans voices.  To correct this, use layering in Noteworthy");
-								Write(")");
+								WriteLn("  % Error");
+								WriteLn("#(ly:warning \"Prematurely ending beam which spans voices.  To correct this, use layering in Noteworthy\")");
+								Write("]");
 								InBeam = false;
 							}
 							if (Slur)
 							{
 								// WriteLn("% Possibly prematurely ending slur which spans voices.  To correct this, use layering in Noteworthy");
-								Write("]");
+								Write(")");
 								Slur = false;
 							}
 							WriteLn("}");
@@ -545,7 +548,8 @@ namespace nwc2ly
 						}
 						else if (Cmd == "RestChord")
 						{
-							WriteLn(" % Incorrectly parsed restchord: notes from chord have not been added");
+							WriteLn("  % Error");
+							WriteLn("#(ly:warning \"Incorrectly parsed restchord: notes from chord have not been added\")");
 							WriteRests(InputList[0].IndexOf("Bar") > -1);
 						}
 						else if (Cmd == "DynamicVariance")
@@ -631,7 +635,8 @@ namespace nwc2ly
 							}
 							else
 							{
-								WriteLn(" % Unparsed text expression: " + Last);
+								WriteLn("  % Error");
+								WriteLn("#(ly:warning \"Unparsed text expression\")");
 							}
 						}
 						else if (Cmd == "PerformanceStyle")
@@ -702,12 +707,15 @@ namespace nwc2ly
 							}
 							else
 							{
-								WriteLn(" % Unparsed Flow command: " + Last);
+								WriteLn("  % Error");
+								WriteLn("#(ly:warning \"Unparsed Flow command: ~a\" \"" + s1 + "\")");
+								WriteLn(" % " + Last);
 							}
 						}
 						else
 						{
-							WriteLn(" % Unparsed command: " + Last);
+							WriteLn("  % Error");
+							WriteLn("#(ly:warning \"Unparsed command: ~a\" \"" + s1 + "\")");
 						}
 						if (Cmd == "Bar")
 						{
@@ -845,7 +853,8 @@ namespace nwc2ly
 									}
 									else
 									{
-										WriteLn("%Error in parameter extraction for ossiaStart command");
+										WriteLn("  % Error");
+										WriteLn("#(ly:warning \"Error in parameter extraction for ossiaStart command\")");
 									}
 								}
 							}
@@ -894,7 +903,8 @@ namespace nwc2ly
 									}
 									else
 									{
-										WriteLn("%Error in parameter extraction for tupletOn command");
+										WriteLn("  % Error");
+										WriteLn("#(ly:warning \"Error in parameter extraction for tupletOn command \")");
 									}
 									Scalefactor = Denominator / Numerator;
 									Write(@" \times " + Numerator + "/" + Denominator + " { ");
@@ -913,28 +923,16 @@ namespace nwc2ly
 								else if (s1.IndexOf("ossiaIncludeEnd") == 0)  // The order of these is important, since ossiaIncludeEnd starts with ossiaInclude
 								{
 									WriteLn(" } ");
-									//									WriteLn("\\new Staff = \"" + OssiaName[0] + "OssiaStaff\" \\with {");
-									//									WriteLn("\\remove \"Time_signature_engraver\"");
-									//									WriteLn("alignAboveContext = #\"" + ThisStave + "\"");
-									//									WriteLn("\\override StaffSymbol #'staff-space = #(magstep -3) % Sets the staff line spacing");
-									//									WriteLn("fontSize = #-2");
-									//									WriteLn(" } ");
-									//									WriteLn(" << "); 
 									for (int l = 0; l < OssiaName.Length; l++)
 									{
 										string FlagStaff = "";
 										if (l == 0) FlagStaff = " Staff ";
-										/*										WriteLn("\\new Voice = \"" + OssiaName[l] + "Ossia\" { ");
-																				WriteLn("\\autoBeamOff");
-																				WriteLn("\\" + OssiaName[l]);
-																				WriteLn(" } "); */
 										WriteLn("%" + OssiaName[l] + "Music");
 										WriteLn("%" + OssiaName[l] + "Lyrics");
 										int FileStartPos = Output.IndexOf("%StartMarker");
 										Output = Output.Insert(FileStartPos, "%OssiaInclude " + OssiaName[l] + FlagStaff + "\r\n");
 										if (l == 0) l++; //Skip stave name
 									}
-									//WriteLn(">>");
 									WriteLn(">>");
 									NextText = "";
 								}
@@ -962,7 +960,8 @@ namespace nwc2ly
 										}
 										else
 										{
-											WriteLn("%Error in parameter extraction for ossiaInclude command");
+											WriteLn("  % Error");
+											WriteLn("#(ly:warning \"Error in parameter extraction for ossiaInclude command \")");
 										}
 									}
 								}
@@ -1076,7 +1075,8 @@ namespace nwc2ly
 									}
 									else
 									{
-										WriteLn("%Error in parameter extraction for tremoloSingle command");
+										WriteLn("  % Error");
+										WriteLn("#(ly:warning \"Error in parameter extraction for tremoloSingle command \")");
 									}
 								}
 								else if (s1.IndexOf("tremoloOff") == 0)
@@ -1128,7 +1128,8 @@ namespace nwc2ly
 									}
 									else
 									{
-										WriteLn("%Error in parameter extraction for scaleDurationsOn command");
+										WriteLn("  % Error");
+										WriteLn("#(ly:warning \" Error in parameter extraction for scaleDurationsOn command\")");
 									}
 								}
 								else if (s1.IndexOf("scaleDurationsOff") == 0)
@@ -1195,14 +1196,14 @@ namespace nwc2ly
 											}
 											else
 											{
-												WriteLn("");
-												WriteLn("%Error in parameter extraction for setSlurComplex command");
+												WriteLn("  % Error");
+												WriteLn("#(ly:warning \"Error in parameter extraction for setSlurComplex command \")");
 											}
 										}
 										else
 										{
-											WriteLn("");
-											WriteLn("%Error in parameter extraction for setSlurComplex command");
+											WriteLn("  % Error");
+											WriteLn("#(ly:warning \"Error in parameter extraction for setSlurComplex command \")");
 										}
 									}
 									else
@@ -1214,8 +1215,8 @@ namespace nwc2ly
 										}
 										else
 										{
-											WriteLn("");
-											WriteLn("%Error in parameter extraction for setSlur command");
+											WriteLn("  % Error");
+											WriteLn("#(ly:warning \"Error in parameter extraction for setSlur command \")");
 										}
 									}
 								}
