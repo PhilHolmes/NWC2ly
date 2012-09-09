@@ -2023,10 +2023,6 @@ namespace nwc2ly
 						InGraceBeam = false;
 					}
 				}
-				if (Line.IndexOf("Triplet=End") > 0)
-				{
-					Write(" } ");
-				}
 				if (Tremolo)
 				{
 					if (!TremoloHandled)
@@ -2040,10 +2036,15 @@ namespace nwc2ly
 				}
 				Last = "";
 			}
+			// Need to write dynamics after note, before "closing" triplets
 			if (Dyn != "")
 			{
 				Write(Dyn + ' ');
 				Dyn = "";
+			}
+			if (Line.IndexOf("Triplet=End") > 0)
+			{
+				Write(" } ");
 			}
 			if (AddedText != "")
 			{
