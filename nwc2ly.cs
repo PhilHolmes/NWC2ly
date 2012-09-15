@@ -110,7 +110,6 @@ namespace nwc2ly
 		public static bool bInDynVar = false;
 		public static bool bInHairCresc = false;
 		public static bool bInHairDim = false;
-		public static string CrescLocation;
 		public static char c = (char)0;
 		public static int BarNo = 0;
 		public static bool Fermata = false;
@@ -146,11 +145,12 @@ namespace nwc2ly
 		private static bool FermataIsUp;
 		private static bool LastCommandWasBarline;
 		private static string GraceType = "";
+		private static bool PreviousStaffLayered;
+
 
 		[STAThread]
 		public static void Main(string[] args)
 		{
-			CrescLocation = "";
 			Output = "";
 			NextText = "";
 			CountBars = true;
@@ -165,6 +165,12 @@ namespace nwc2ly
 			Scalefactor = 1;
 			FermataIsUp = true;
 			LastCommandWasBarline = true;
+
+			PreviousStaffLayered = false;
+			if (args[4] == "True")
+			{
+				PreviousStaffLayered = true;
+			}
 
 			bool OssiaStave = false;
 			bool InOssia = false;
@@ -323,6 +329,7 @@ namespace nwc2ly
 				}
 				else
 				{
+					WriteLn("\\dynamicDown");
 					WriteLn("\\autoBeamOff");
 					WriteLn(" \\accidentalStyle \"piano-cautionary\"");
 				}
@@ -488,14 +495,17 @@ namespace nwc2ly
 						}
 						else if (Cmd == "Dynamic")
 						{
-							Dyn = "";
-							if (bInDynVar)
+							if (!PreviousStaffLayered)
 							{
-								Dyn = @" \! ";
-								bInDynVar = false;
+								Dyn = "";
+								if (bInDynVar)
+								{
+									Dyn = @" \! ";
+									bInDynVar = false;
+								}
+								Dyn = Dyn + " \\" + GetPar("Style", Line, true);
+								Last = "";
 							}
-							Dyn = Dyn + " \\" + GetPar("Style", Line, true);
-							Last = "";
 						}
 						else if (Cmd == "TimeSig")
 						{
@@ -554,38 +564,40 @@ namespace nwc2ly
 						}
 						else if (Cmd == "DynamicVariance")
 						{
-							s1 = GetPar("Style", Line);
-							CrescLocation = GetPosChar(Line);
-							Dyn = "";
-							if (bInDynVar)
+							if (!PreviousStaffLayered)
 							{
-								Dyn = @" \! ";
-								bInDynVar = false;
+								s1 = GetPar("Style", Line);
+								Dyn = "";
+								if (bInDynVar)
+								{
+									Dyn = @" \! ";
+									bInDynVar = false;
+								}
+								if (s1 == "Crescendo")
+								{
+									Dyn += @" \cresc";
+									bInDynVar = true;
+								}
+								else if (s1 == "Decrescendo")
+								{
+									Dyn += @" \decresc";
+									bInDynVar = true;
+								}
+								else if (s1 == "Diminuendo")
+								{
+									Dyn += @" \dim";
+									bInDynVar = true;
+								}
+								else if (s1 == "Sforzando")
+								{
+									Dyn += @" \sf";
+								}
+								else if (s1 == "Rinforzando")
+								{
+									Dyn += @" \rfz";
+								}
+								Last = "";
 							}
-							if (s1 == "Crescendo")
-							{
-								Dyn += @" \cresc";
-								bInDynVar = true;
-							}
-							else if (s1 == "Decrescendo")
-							{
-								Dyn += @" \decresc";
-								bInDynVar = true;
-							}
-							else if (s1 == "Diminuendo")
-							{
-								Dyn += @" \dim";
-								bInDynVar = true;
-							}
-							else if (s1 == "Sforzando")
-							{
-								Dyn += @" \sf";
-							}
-							else if (s1 == "Rinforzando")
-							{
-								Dyn += @" \rfz";
-							}
-							Last = "";
 						}
 						else if (Cmd == "Tempo")
 						{
@@ -1505,6 +1517,7 @@ namespace nwc2ly
 
 		public static void CheckCresc()
 		{
+			if (PreviousStaffLayered) return;
 			bool bHairCresc;
 			bool bHairDim;
 			bHairCresc = GetPar("Opts", Line, true).IndexOf("Crescendo") >= 0;
@@ -1527,7 +1540,7 @@ namespace nwc2ly
 				}
 				if (!bInHairCresc)
 				{
-					Write(CrescLocation + @" \< ");
+					Write(@" \< ");
 					bInHairCresc = true;
 				}
 			}
@@ -1548,7 +1561,7 @@ namespace nwc2ly
 				}
 				if (!bInHairDim)
 				{
-					Write(CrescLocation + @" \> ");
+					Write(@" \> ");
 					bInHairDim = true;
 				}
 			}
@@ -1655,7 +1668,10 @@ namespace nwc2ly
 				catch (Exception) { }
 				if (Repeats > 2)
 				{
-					Write("_\\markup {\\small \\italic \"(" + Repeats.ToString() + " times)\"}");
+					if (!PreviousStaffLayered)
+					{
+						Write("_\\markup {\\small \\italic \"(" + Repeats.ToString() + " times)\"}");
+					}
 				}
 				Write("  \\bar \":|\"  % ");
 			}
