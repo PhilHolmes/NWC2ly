@@ -58,7 +58,6 @@
   <ItemGroup>
     <Compile Include="nwc2ly.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <None Include="nwc2ly.dpr" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="App.ico" />

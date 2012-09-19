@@ -825,6 +825,12 @@ namespace nwc2ly
 										Output = Output.Insert(LastNotePos, LastNoteVal + LastNoteDur + LastNoteDot + @"*1/2 " + SlurBeam + LastNoteSuffix + @" \once \override NoteColumn #'ignore-collision = ##t \hideNotes " + LastNoteVal + LastNoteDur * 2 + LastNoteDot + @" \unHideNotes " + BarSuffix);
 									}
 									InOssia = false;
+									CheckCresc();
+									if (bInDynVar)
+									{
+										Write (@" <>\! ");
+										bInDynVar = false;
+									}
 									WriteLn(" }");
 								}
 							}
@@ -1257,7 +1263,10 @@ namespace nwc2ly
 				}
 			} while (InputList.Count > 0);
 			CheckCresc();
-			if (bInDynVar) Write(@" \! ");
+			if (bInDynVar)
+			{
+				Write(@" \! ");
+			}
 			if (AddedText != "")
 			{
 				Write(AddedText + ' ');
@@ -1530,7 +1539,6 @@ namespace nwc2ly
 					bInDynVar = false;
 				}
 			}
-
 			if (bHairCresc)
 			{
 				if (bInHairDim)
