@@ -145,8 +145,9 @@ namespace nwc2ly
 		private static bool FermataIsUp;
 		private static bool LastCommandWasBarline;
 		private static string GraceType = "";
-		private static bool PreviousStaffLayered;
-
+		private static bool VoiceHidden;
+		private static string OutputFilename = "";
+		private static string OutDyn = "";
 
 		[STAThread]
 		public static void Main(string[] args)
@@ -165,11 +166,12 @@ namespace nwc2ly
 			Scalefactor = 1;
 			FermataIsUp = true;
 			LastCommandWasBarline = true;
+			OutDyn = "";
 
-			PreviousStaffLayered = false;
+			VoiceHidden = false;
 			if (args[4] == "True")
 			{
-				PreviousStaffLayered = true;
+				VoiceHidden = true;
 			}
 
 			bool OssiaStave = false;
@@ -178,7 +180,6 @@ namespace nwc2ly
 			string KeySig = "";
 			string[] OssiaName = { "" };
 			string ThisStave = "";
-			string OutputFilename = "";
 
 			ShowAccidentals = false;
 			ShowCautionaries = false;
@@ -321,7 +322,6 @@ namespace nwc2ly
 			{
 				if (args[2] == "Up")
 				{
-					WriteLn("\\dynamicUp");
 					WriteLn("\\autoBeamOff");
 					// WriteLn("\\override MultiMeasureRest #'staff-position = #0");
 					WriteLn("\\override MultiMeasureRest #'expand-limit = #1");
@@ -329,7 +329,6 @@ namespace nwc2ly
 				}
 				else
 				{
-					WriteLn("\\dynamicDown");
 					WriteLn("\\autoBeamOff");
 					WriteLn(" \\accidentalStyle \"piano-cautionary\"");
 				}
@@ -495,7 +494,7 @@ namespace nwc2ly
 						}
 						else if (Cmd == "Dynamic")
 						{
-							if (!PreviousStaffLayered)
+							if (!VoiceHidden)
 							{
 								Dyn = "";
 								if (bInDynVar)
@@ -564,7 +563,7 @@ namespace nwc2ly
 						}
 						else if (Cmd == "DynamicVariance")
 						{
-							if (!PreviousStaffLayered)
+							if (!VoiceHidden)
 							{
 								s1 = GetPar("Style", Line);
 								Dyn = "";
@@ -825,7 +824,7 @@ namespace nwc2ly
 										Output = Output.Insert(LastNotePos, LastNoteVal + LastNoteDur + LastNoteDot + @"*1/2 " + SlurBeam + LastNoteSuffix + @" \once \override NoteColumn #'ignore-collision = ##t \hideNotes " + LastNoteVal + LastNoteDur * 2 + LastNoteDot + @" \unHideNotes " + BarSuffix);
 									}
 									InOssia = false;
-									CheckCresc();
+									CheckHairCresc();
 									if (bInDynVar)
 									{
 										Write (@" <>\! ");
@@ -881,7 +880,6 @@ namespace nwc2ly
 						{
 							// Hidden text
 							{
-
 								if (s1.IndexOf("##") == 0)
 								{
 									if (s1.IndexOf(@"##\mark") == 0)
@@ -1262,7 +1260,7 @@ namespace nwc2ly
 					}
 				}
 			} while (InputList.Count > 0);
-			CheckCresc();
+			CheckHairCresc();
 			if (bInDynVar)
 			{
 				Write(@" \! ");
@@ -1304,6 +1302,15 @@ namespace nwc2ly
 				if (InFile != null)
 				{
 					InFile.Close();
+				}
+				if (!VoiceHidden)
+				{
+					FileInfo LyOutFile = new FileInfo(args[1]);
+					string DynFile = LyOutFile.DirectoryName + "\\" + LyOutFile.Name.Replace(LyOutFile.Extension, "Dyn.ly");
+					OutFile = new StreamWriter(DynFile, false);
+					OutDyn += @" \!"; //Don't think it can harm to add terminator at end.
+					OutFile.Write(OutDyn);
+					OutFile.Close();
 				}
 			}
 #if DEBUG
@@ -1523,32 +1530,90 @@ namespace nwc2ly
 			}
 			return RetVal;
 		}
-
-		public static void CheckCresc()
+		public static string HalfDur(string ThisDur)
 		{
-			if (PreviousStaffLayered) return;
-			bool bHairCresc;
-			bool bHairDim;
-			bHairCresc = GetPar("Opts", Line, true).IndexOf("Crescendo") >= 0;
-			bHairDim = GetPar("Opts", Line, true).IndexOf("Diminuendo") >= 0;
+			string Dots = "";
+			if (ThisDur.IndexOf("..") > -1)
+			{
+				Dots = "..";
+				ThisDur = ThisDur.Replace("..", "");
+			}
+			if (ThisDur.IndexOf(".") > -1)
+			{
+				Dots = ".";
+				ThisDur = ThisDur.Replace(".", "");
+			}
+			int DurVal = int.Parse(ThisDur);
+			ThisDur = (DurVal * 2).ToString() + Dots;
+			return ThisDur;
+		}
+		public static string CreateSpacers(string ThisDur)
+		{
+			string Dots = "";
+			string RetVal = "";
+			int SpacerLen = 256;
+			if (ThisDur.IndexOf("..") > -1)
+			{
+				Dots = "..";
+				ThisDur = ThisDur.Replace("..", "");
+			}
+			if (ThisDur.IndexOf(".") > -1)
+			{
+				Dots = ".";
+				ThisDur = ThisDur.Replace(".", "");
+			}
+			int DurVal = int.Parse(ThisDur);
+			int Reps = SpacerLen / DurVal - 2;
+			RetVal = @"\repeat unfold " + Reps.ToString() + @" { s" + SpacerLen.ToString() + Dots + @" } s" + SpacerLen.ToString() + Dots + @" \! s" + SpacerLen.ToString() + Dots + " ";
+			return RetVal;
+		}
+		public static void CheckHairCresc()
+		{
+			if (VoiceHidden) return;  // Prevents writing dynamics on "hidden" staves
+			bool bHairCresc = GetPar("Opts", Line, true).IndexOf("Crescendo") >= 0;
+			bool bHairDim = GetPar("Opts", Line, true).IndexOf("Diminuendo") >= 0;
 			if (bInDynVar)
 			{ // Dynamic variation may need "closing"
 				if (bHairCresc || bHairDim)
 				{
-					Write(@" \! ");
+					Dyn += (@" \! ");
 					bInDynVar = false;
+				}
+			}
+			// Note - the next 10 or so lines are copied and pasted to before the
+			//  dim code - we need to recalculate because of insertions
+			int LastDynTokenPos = OutDyn.LastIndexOf('s');
+			string ThisDur = OutDyn.Substring(LastDynTokenPos + 1).Trim();
+			string StuffAtEnd = "";
+			if (ThisDur.IndexOf(" ") > -1)
+			{
+				StuffAtEnd = ThisDur.Substring(ThisDur.IndexOf(" ") + 1).Trim() + " ";
+				ThisDur = ThisDur.Substring(0, ThisDur.IndexOf(" "));
+			}
+			int PreviousDynTokenPos = 0;
+			string PrevDur = "";
+			if (LastDynTokenPos > 0)
+			{
+				PreviousDynTokenPos = OutDyn.Substring(0, LastDynTokenPos - 1).LastIndexOf('s');
+				PrevDur = OutDyn.Substring(PreviousDynTokenPos + 1, LastDynTokenPos - PreviousDynTokenPos - 2);
+				if (PrevDur.IndexOf("%") > -1)
+				{
+					PrevDur = PrevDur.Substring(0, PrevDur.IndexOf("%") - 1).Trim();
+				}
+				if (PrevDur.IndexOf(" ") > -1)
+				{
+					PrevDur = PrevDur.Substring(0, PrevDur.IndexOf(" ") - 1).Trim();
 				}
 			}
 			if (bHairCresc)
 			{
-				if (bInHairDim)
-				{
-					Write(@" \! ");
-					bInHairDim = false;
-				}
 				if (!bInHairCresc)
 				{
-					Write(@" \< ");
+					OutDyn = OutDyn.Remove(LastDynTokenPos);
+					OutDyn += "s" + HalfDur(ThisDur) + " ";
+					OutDyn += StuffAtEnd;
+					OutDyn += @"\< ";
+					OutDyn += "s" + HalfDur(ThisDur) + " ";
 					bInHairCresc = true;
 				}
 			}
@@ -1556,20 +1621,49 @@ namespace nwc2ly
 			{
 				if (bInHairCresc)
 				{
-					Write(@" \! ");
+					// The hairpin is now over, but we've written the next note already
+					// Need to add a \! to the _previous_ note, which should be
+					// sub-divided to get it the right length.
+					string EndHair = CreateSpacers(PrevDur);
+					OutDyn = OutDyn.Remove(PreviousDynTokenPos, LastDynTokenPos - PreviousDynTokenPos);
+					OutDyn = OutDyn.Insert(PreviousDynTokenPos, EndHair);
 					bInHairCresc = false;
 				}
 			}
+			// Note - copied and pasted code
+			LastDynTokenPos = OutDyn.LastIndexOf('s');
+			ThisDur = OutDyn.Substring(LastDynTokenPos + 1).Trim();
+			StuffAtEnd = "";
+			if (ThisDur.IndexOf(" ") > -1)
+			{
+				StuffAtEnd = ThisDur.Substring(ThisDur.IndexOf(" ") + 1).Trim() + " ";
+				ThisDur = ThisDur.Substring(0, ThisDur.IndexOf(" "));
+			}
+			PreviousDynTokenPos = 0;
+			PrevDur = "";
+			if (LastDynTokenPos > 0)
+			{
+				PreviousDynTokenPos = OutDyn.Substring(0, LastDynTokenPos - 1).LastIndexOf('s');
+				PrevDur = OutDyn.Substring(PreviousDynTokenPos + 1, LastDynTokenPos - PreviousDynTokenPos - 2);
+				if (PrevDur.IndexOf("%") > -1)
+				{
+					PrevDur = PrevDur.Substring(0, PrevDur.IndexOf("%") - 1).Trim();
+				}
+				if (PrevDur.IndexOf(" ") > -1)
+				{
+					PrevDur = PrevDur.Substring(0, PrevDur.IndexOf(" ") - 1).Trim();
+				}
+			}
+			// End copy and paste
 			if (bHairDim)
 			{
-				if (bInHairCresc)
-				{
-					Write(@" \! ");
-					bInHairCresc = false;
-				}
 				if (!bInHairDim)
 				{
-					Write(@" \> ");
+					OutDyn = OutDyn.Remove(LastDynTokenPos);
+					OutDyn += "s" + HalfDur(ThisDur) + " ";
+					OutDyn += StuffAtEnd;
+					OutDyn += @"\> ";
+					OutDyn += "s" + HalfDur(ThisDur) + " ";
 					bInHairDim = true;
 				}
 			}
@@ -1577,10 +1671,16 @@ namespace nwc2ly
 			{
 				if (bInHairDim)
 				{
-					Write(@" \! ");
+					// The hairpin is now over, but we've written the next note already
+					// Need to add a \! to the _previous_ note, which should be
+					// sub-divided to get it the right length.
+					string EndHair = CreateSpacers(PrevDur);
+					OutDyn = OutDyn.Remove(PreviousDynTokenPos, LastDynTokenPos - PreviousDynTokenPos);
+					OutDyn = OutDyn.Insert(PreviousDynTokenPos, EndHair);
 					bInHairDim = false;
 				}
 			}
+			return;
 		}
 
 		private static string GetPosChar(string Input)
@@ -1676,7 +1776,7 @@ namespace nwc2ly
 				catch (Exception) { }
 				if (Repeats > 2)
 				{
-					if (!PreviousStaffLayered)
+					if (!VoiceHidden)
 					{
 						Write("_\\markup {\\small \\italic \"(" + Repeats.ToString() + " times)\"}");
 					}
@@ -1717,6 +1817,7 @@ namespace nwc2ly
 			{
 				WriteLn(BarNo.ToString());
 			}
+			OutDyn += " % " + BarNo.ToString() + "\r\n";
 			if (CountBars)
 			{
 				BarNo++;
@@ -1740,6 +1841,7 @@ namespace nwc2ly
 			}
 			else
 			{
+				// CheckHairCresc();
 				Match NoteMatch = FindHiddenNoteHead.Match(Line);
 				if (NoteMatch.Success)
 				{
@@ -1801,7 +1903,6 @@ namespace nwc2ly
 						xNoteHead = false;
 					}
 				}
-
 				if (Tremolo)
 				{
 					int NewNoteLength = 4;
@@ -1940,7 +2041,7 @@ namespace nwc2ly
 					{
 						BarKey[Note[0] - 'a'] = s5[0];
 					}
-					Write(' ' + Note + Octave);
+					Write(' ' + Note + Octave);  // This is where the note pitch is written
 					if (ShowAccidentals)
 					{
 						if (WhichNoteIsAccidental.Length > 0)
@@ -1965,7 +2066,8 @@ namespace nwc2ly
 				{
 					Write(">");
 				}
-				Write(s3); // duration
+				Write(s3); // This is where the note duration is written
+				OutDyn += "s" + s3 + " ";
 				if (TremSingle)
 				{
 					Write(":" + TremValue.ToString());
@@ -2022,7 +2124,6 @@ namespace nwc2ly
 						}
 					}
 				}
-				CheckCresc();
 				if (Line.IndexOf("Beam=First") > 0)
 				{
 					Write(" [ ");
@@ -2063,17 +2164,20 @@ namespace nwc2ly
 			// Need to write dynamics after note, before "closing" triplets
 			if (Dyn != "")
 			{
-				Write(Dyn + ' ');
+				//Write(Dyn + ' ');
+				OutDyn += Dyn + " ";
 				Dyn = "";
 			}
-			if (Line.IndexOf("Triplet=End") > 0)
-			{
-				Write(" } ");
-			}
+			CheckHairCresc();
+			// Ditto added text
 			if (AddedText != "")
 			{
 				Write(AddedText + ' ');
 				AddedText = "";
+			}
+			if (Line.IndexOf("Triplet=End") > 0)
+			{
+				Write(" } ");
 			}
 		}
 		private static string GetColour()
@@ -2165,10 +2269,12 @@ namespace nwc2ly
 				if (s1 == "1")
 				{
 					Write(" s1*" + TimeSig + " ");
+					OutDyn += "s1*" + TimeSig + " ";
 				}
 				else
 				{
 					Write(" s" + s1 + " ");  // This ensures that hidden rests still have a time value
+					OutDyn += "s" + s1 + " ";
 				}
 				LastRestWasWhole = false;
 			}
@@ -2197,11 +2303,16 @@ namespace nwc2ly
 						Output = Output.Remove(iPos, RestString.Length);
 						WholeRestCount++;
 						Output = Output.Insert(iPos, " R1*" + TimeSig + "*" + WholeRestCount);
+
+						iPos = OutDyn.LastIndexOf(RestString);
+						OutDyn = OutDyn.Remove(iPos, RestString.Length);
+						OutDyn = OutDyn.Insert(iPos, " R1*" + TimeSig + "*" + WholeRestCount);
 					}
 					else
 					{
 						WholeRestCount = 1;
 						Write(" R1*" + TimeSig + "*1");
+						OutDyn += " R1*" + TimeSig + "*1";
 					}
 					LastRestWasWhole = true;
 				}
@@ -2215,6 +2326,7 @@ namespace nwc2ly
 					{
 						Write(NoteEquiv + s1 + @"\rest ");
 					}
+					OutDyn += "s" + s1 + " ";
 					LastRestWasWhole = false;
 				}
 			}
@@ -2242,7 +2354,7 @@ namespace nwc2ly
 				Write(AddedText + ' ');
 				AddedText = "";
 			}
-			CheckCresc();
+			CheckHairCresc();
 			if (Line.IndexOf("Triplet=End") > 0)
 			{
 				Write(" } ");
