@@ -524,6 +524,7 @@ namespace nwc2ly
 								WriteLn(@"\numericTimeSignature");
 							}
 							WriteLn(" \\time " + s1);
+							OutDyn += " \\time " + s1 + " ";
 							TimeSig = s1;
 							Last = "";
 						}
@@ -1261,10 +1262,6 @@ namespace nwc2ly
 				}
 			} while (InputList.Count > 0);
 			CheckHairCresc();
-			if (bInDynVar)
-			{
-				Write(@" \! ");
-			}
 			if (AddedText != "")
 			{
 				Write(AddedText + ' ');
@@ -1564,123 +1561,81 @@ namespace nwc2ly
 			}
 			int DurVal = int.Parse(ThisDur);
 			int Reps = SpacerLen / DurVal - 2;
+			if (Reps > 62)
+			{
+			}
 			RetVal = @"\repeat unfold " + Reps.ToString() + @" { s" + SpacerLen.ToString() + Dots + @" } s" + SpacerLen.ToString() + Dots + @" \! s" + SpacerLen.ToString() + Dots + " ";
 			return RetVal;
 		}
 		public static void CheckHairCresc()
 		{
-			if (VoiceHidden) return;  // Prevents writing dynamics on "hidden" staves
-			bool bHairCresc = GetPar("Opts", Line, true).IndexOf("Crescendo") >= 0;
-			bool bHairDim = GetPar("Opts", Line, true).IndexOf("Diminuendo") >= 0;
+			if (VoiceHidden) return;
+			CheckHairType("\\<", "Crescendo", "Diminuendo", ref bInHairCresc, ref bInHairDim);
+			CheckHairType("\\>", "Diminuendo", "Crescendo", ref bInHairDim, ref bInHairCresc);
+		}
+		public static void CheckHairType(string Startstring, string ThisHair, string OtherHair, ref bool ThisAlready, ref bool OtherAlready)
+		{
+			Regex Spacers = new Regex("s[0-9]{1,3}[\\.]?");
+			Regex Dynamics = new Regex("[\\\\mfp]{2,4}");
+			Match LastSpacer;
+			Match PenSpacer;
+
+			bool bThis = GetPar("Opts", Line, true).IndexOf(ThisHair) >= 0;
+			bool bOther = GetPar("Opts", Line, true).IndexOf(OtherHair) >= 0;
 			if (bInDynVar)
 			{ // Dynamic variation may need "closing"
-				if (bHairCresc || bHairDim)
+				if (bThis || bOther)
 				{
-					Dyn += (@" \! ");
+					// OutDyn += (@" \! ");
 					bInDynVar = false;
 				}
 			}
-			// Note - the next 10 or so lines are copied and pasted to before the
-			//  dim code - we need to recalculate because of insertions
-			int LastDynTokenPos = OutDyn.LastIndexOf('s');
-			string ThisDur = OutDyn.Substring(LastDynTokenPos + 1).Trim();
-			string StuffAtEnd = "";
-			if (ThisDur.IndexOf(" ") > -1)
+			MatchCollection AllSpacers = Spacers.Matches(OutDyn);
+			int SpacerCount = AllSpacers.Count;
+			if (SpacerCount > 0)
 			{
-				StuffAtEnd = ThisDur.Substring(ThisDur.IndexOf(" ") + 1).Trim() + " ";
-				ThisDur = ThisDur.Substring(0, ThisDur.IndexOf(" "));
-			}
-			int PreviousDynTokenPos = 0;
-			string PrevDur = "";
-			if (LastDynTokenPos > 0)
-			{
-				PreviousDynTokenPos = OutDyn.Substring(0, LastDynTokenPos - 1).LastIndexOf('s');
-				PrevDur = OutDyn.Substring(PreviousDynTokenPos + 1, LastDynTokenPos - PreviousDynTokenPos - 2);
-				if (PrevDur.IndexOf("%") > -1)
+				LastSpacer = AllSpacers[SpacerCount - 1];
+				string ThisDur = LastSpacer.Value.ToString().Replace("s", "");
+
+				if (bThis)
 				{
-					PrevDur = PrevDur.Substring(0, PrevDur.IndexOf("%") - 1).Trim();
+					if (!ThisAlready)
+					{
+						string EndDyn = "";
+						Match EndDynamic = Dynamics.Match(OutDyn.Substring(LastSpacer.Index));
+						if (EndDynamic.Success) EndDyn = EndDynamic.Value.ToString();
+						OutDyn = OutDyn.Remove(LastSpacer.Index + EndDynamic.Index, EndDynamic.Length);
+						OutDyn = OutDyn.Remove(LastSpacer.Index, LastSpacer.Length);
+
+						string MakeCresc = "s" + HalfDur(ThisDur) + " ";
+						MakeCresc += EndDyn + " ";
+						MakeCresc += Startstring + " ";
+						MakeCresc += "s" + HalfDur(ThisDur) + " ";
+						OutDyn = OutDyn.Insert(LastSpacer.Index, MakeCresc);
+						ThisAlready = true;
+					}
 				}
-				if (PrevDur.IndexOf(" ") > -1)
+				else
 				{
-					PrevDur = PrevDur.Substring(0, PrevDur.IndexOf(" ") - 1).Trim();
-				}
-			}
-			if (bHairCresc)
-			{
-				if (!bInHairCresc)
-				{
-					OutDyn = OutDyn.Remove(LastDynTokenPos);
-					OutDyn += "s" + HalfDur(ThisDur) + " ";
-					OutDyn += StuffAtEnd;
-					OutDyn += @"\< ";
-					OutDyn += "s" + HalfDur(ThisDur) + " ";
-					bInHairCresc = true;
-				}
-			}
-			else
-			{
-				if (bInHairCresc)
-				{
-					// The hairpin is now over, but we've written the next note already
-					// Need to add a \! to the _previous_ note, which should be
-					// sub-divided to get it the right length.
-					string EndHair = CreateSpacers(PrevDur);
-					OutDyn = OutDyn.Remove(PreviousDynTokenPos, LastDynTokenPos - PreviousDynTokenPos);
-					OutDyn = OutDyn.Insert(PreviousDynTokenPos, EndHair);
-					bInHairCresc = false;
+					if (ThisAlready)
+					{
+						if (SpacerCount > 1)
+						{
+							PenSpacer = AllSpacers[SpacerCount - 2];
+
+							// The hairpin is now over, but we've written the next note already
+							// Need to add a \! to the _previous_ note, which should be
+							// sub-divided to get it the right length.
+							string PrevDur = PenSpacer.Value.ToString().Replace("s", "");
+							string EndHair = CreateSpacers(PrevDur);
+							OutDyn = OutDyn.Remove(PenSpacer.Index, PenSpacer.Length);
+							OutDyn = OutDyn.Insert(PenSpacer.Index, EndHair);
+							ThisAlready = false;
+						}
+					}
+
 				}
 			}
-			// Note - copied and pasted code
-			LastDynTokenPos = OutDyn.LastIndexOf('s');
-			ThisDur = OutDyn.Substring(LastDynTokenPos + 1).Trim();
-			StuffAtEnd = "";
-			if (ThisDur.IndexOf(" ") > -1)
-			{
-				StuffAtEnd = ThisDur.Substring(ThisDur.IndexOf(" ") + 1).Trim() + " ";
-				ThisDur = ThisDur.Substring(0, ThisDur.IndexOf(" "));
-			}
-			PreviousDynTokenPos = 0;
-			PrevDur = "";
-			if (LastDynTokenPos > 0)
-			{
-				PreviousDynTokenPos = OutDyn.Substring(0, LastDynTokenPos - 1).LastIndexOf('s');
-				PrevDur = OutDyn.Substring(PreviousDynTokenPos + 1, LastDynTokenPos - PreviousDynTokenPos - 2);
-				if (PrevDur.IndexOf("%") > -1)
-				{
-					PrevDur = PrevDur.Substring(0, PrevDur.IndexOf("%") - 1).Trim();
-				}
-				if (PrevDur.IndexOf(" ") > -1)
-				{
-					PrevDur = PrevDur.Substring(0, PrevDur.IndexOf(" ") - 1).Trim();
-				}
-			}
-			// End copy and paste
-			if (bHairDim)
-			{
-				if (!bInHairDim)
-				{
-					OutDyn = OutDyn.Remove(LastDynTokenPos);
-					OutDyn += "s" + HalfDur(ThisDur) + " ";
-					OutDyn += StuffAtEnd;
-					OutDyn += @"\> ";
-					OutDyn += "s" + HalfDur(ThisDur) + " ";
-					bInHairDim = true;
-				}
-			}
-			else
-			{
-				if (bInHairDim)
-				{
-					// The hairpin is now over, but we've written the next note already
-					// Need to add a \! to the _previous_ note, which should be
-					// sub-divided to get it the right length.
-					string EndHair = CreateSpacers(PrevDur);
-					OutDyn = OutDyn.Remove(PreviousDynTokenPos, LastDynTokenPos - PreviousDynTokenPos);
-					OutDyn = OutDyn.Insert(PreviousDynTokenPos, EndHair);
-					bInHairDim = false;
-				}
-			}
-			return;
 		}
 
 		private static string GetPosChar(string Input)
@@ -1905,6 +1860,7 @@ namespace nwc2ly
 				}
 				if (Tremolo)
 				{
+					OutDyn += "s" + s3 + " ";
 					int NewNoteLength = 4;
 					try
 					{
@@ -1932,6 +1888,7 @@ namespace nwc2ly
 						Grace = false;
 					}
 					Write("\\times 2/3 { ");
+					OutDyn += "\\times 2/3 { ";
 				}
 				if (Grace)
 				{
@@ -2067,7 +2024,13 @@ namespace nwc2ly
 					Write(">");
 				}
 				Write(s3); // This is where the note duration is written
-				OutDyn += "s" + s3 + " ";
+				if (!Grace)
+				{
+					if (!Tremolo)
+					{
+						OutDyn += "s" + s3 + " ";
+					}
+				}
 				if (TremSingle)
 				{
 					Write(":" + TremValue.ToString());
@@ -2178,6 +2141,7 @@ namespace nwc2ly
 			if (Line.IndexOf("Triplet=End") > 0)
 			{
 				Write(" } ");
+				OutDyn += " } ";
 			}
 		}
 		private static string GetColour()
@@ -2254,6 +2218,7 @@ namespace nwc2ly
 			if (Line.IndexOf("Triplet=First") >= 0)
 			{
 				Write("\\times 2/3 { ");
+				OutDyn += "\\times 2/3 { ";
 			}
 			if (HideNote)
 			{
@@ -2358,6 +2323,7 @@ namespace nwc2ly
 			if (Line.IndexOf("Triplet=End") > 0)
 			{
 				Write(" } ");
+				OutDyn += " } ";
 			}
 			Last = "";
 		}
