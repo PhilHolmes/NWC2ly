@@ -894,6 +894,11 @@ namespace nwc2ly
 									s1 = s1.Substring(2);
 									Write(" " + s1 + " ");
 								}
+								else if (s1.IndexOf("graceSpace") == 0)
+								{
+									OutDyn += " \\grace s8";
+									Write(" \\grace s8 ");
+								}
 								else if (s1.IndexOf("dupletOn") == 0)
 								{
 									Scalefactor = (Decimal)2 / 3;
@@ -1071,6 +1076,12 @@ namespace nwc2ly
 									WriteLn("    }");
 									WriteLn("  }");
 								}
+								else if (s1.IndexOf("tickMark") == 0)
+								{
+									WriteLn("");
+									WriteLn(@"\once \override BreathingSign.Y-offset = #2.6");
+									WriteLn("\\once \\override BreathingSign.text = \\markup { \\musicglyph #\"scripts.tickmark\" } ");
+								}
 								else if (s1.IndexOf("tremoloOn") == 0)
 								{
 									Tremolo = true;
@@ -1167,7 +1178,7 @@ namespace nwc2ly
 										switch (GraceVal)
 										{
 											case "grace":
-												GraceType="grace";
+												GraceType = "grace";
 												break;
 											case "slash":
 												GraceType = "slashedGrace";
@@ -1690,7 +1701,7 @@ namespace nwc2ly
 						WriteLn(" \\set Score.repeatCommands = #'((volta #f))");
 						bInEnding = false;
 					}
-					Write("  \\bar \"|:\"  % ");
+					Write("  \\bar \".|:\"  % ");
 				}
 				else
 				{
@@ -1707,18 +1718,18 @@ namespace nwc2ly
 				}
 				if (NextLine.IndexOf("|Bar|Style:MasterRepeatOpen") > -1)
 				{
-					Write("  \\bar \":|:\"  % ");
+					Write("  \\bar \":..:\"  % ");
 					BarNo--;
 					CloseLast = true;
 				}
 				else
 				{
-					Write("  \\bar \":|\"  % ");
+					Write("  \\bar \":|.\"  % ");
 				}
 			}
 			else if (s1 == "LocalRepeatOpen")
 			{
-				Write("  \\bar \"|:\"  % ");
+				Write("  \\bar \".|:\"  % ");
 			}
 			else if (s1 == "LocalRepeatClose")
 			{
@@ -1736,7 +1747,7 @@ namespace nwc2ly
 						Write("_\\markup {\\small \\italic \"(" + Repeats.ToString() + " times)\"}");
 					}
 				}
-				Write("  \\bar \":|\"  % ");
+				Write("  \\bar \":|.\"  % ");
 			}
 			else if (s1 == "SectionOpen")
 			{
@@ -1885,6 +1896,7 @@ namespace nwc2ly
 					if (Grace)
 					{
 						Write(" } ");
+						OutDyn += " } ";
 						Grace = false;
 					}
 					Write("\\times 2/3 { ");
@@ -1900,6 +1912,7 @@ namespace nwc2ly
 							afterGrace = false;
 						}
 						Write(" } ");
+						OutDyn += " } ";
 						Grace = false;
 					}
 				}
@@ -1914,16 +1927,19 @@ namespace nwc2ly
 						if (GraceType.Length > 0)
 						{
 							Write(" \\" + GraceType + " { ");
+							OutDyn += " \\" + GraceType + " { ";
 						}
 						else
 						{
 							if (UseAcc)
 							{
 								Write(" \\acciaccatura { ");
+								OutDyn += " \\acciaccatura { ";
 							}
 							else
 							{
 								Write(" \\grace { ");
+								OutDyn += " \\grace { ";
 							}
 						}
 					}
@@ -2024,12 +2040,9 @@ namespace nwc2ly
 					Write(">");
 				}
 				Write(s3); // This is where the note duration is written
-				if (!Grace)
+				if (!Tremolo)
 				{
-					if (!Tremolo)
-					{
-						OutDyn += "s" + s3 + " ";
-					}
+					OutDyn += "s" + s3 + " ";
 				}
 				if (TremSingle)
 				{
@@ -2230,6 +2243,7 @@ namespace nwc2ly
 				if (Line.IndexOf("Grace") >= 0)
 				{
 					Write(@"\grace "); // Grace skips
+					OutDyn += @"\grace ";
 				}
 				if (s1 == "1")
 				{
@@ -2311,7 +2325,7 @@ namespace nwc2ly
 			}
 			if (Dyn != "")
 			{
-				Write(Dyn + ' ');
+				OutDyn += Dyn + ' ';
 				Dyn = "";
 			}
 			if (AddedText != "")
