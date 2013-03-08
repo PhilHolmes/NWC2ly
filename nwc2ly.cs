@@ -168,8 +168,36 @@ namespace nwc2ly
 			LastCommandWasBarline = true;
 			OutDyn = "";
 
-			VoiceHidden = false;
-			if (args[4] == "True")
+			string inputFile = "";
+			string outputFile = "";
+			string DynamicsDirection = "";
+			bool AccChecked = false;
+			bool StaffAboveLayered = false;
+			bool autoBeam = false;
+
+			switch (args.Length)
+			{
+				case 6:
+					autoBeam = bool.Parse(args[5]);
+					goto case 5;
+				case 5:
+					StaffAboveLayered = bool.Parse(args[4]);
+					goto case 4;
+				case 4:
+					AccChecked = bool.Parse(args[3]);
+					goto case 3;
+				case 3:
+					DynamicsDirection = args[2];
+					goto case 2;
+				case 2:
+					outputFile = args[1];
+					goto case 1;
+				case 1:
+					inputFile = args[0];
+					break;
+			}
+
+			if (StaffAboveLayered)
 			{
 				VoiceHidden = true;
 			}
@@ -201,7 +229,7 @@ namespace nwc2ly
 			StreamReader InFile = null;
 			if (args.Length > 0)
 			{
-				InFile = new StreamReader(args[0]);
+				InFile = new StreamReader(inputFile);
 				Console.SetIn(InFile);
 			}
 			else
@@ -213,7 +241,7 @@ namespace nwc2ly
 
 			if (args.Length > 1)
 			{
-				FileInfo OutInfo = new FileInfo(args[1]);
+				FileInfo OutInfo = new FileInfo(outputFile);
 				OutputFilename = OutInfo.Name;
 			}
 
@@ -320,29 +348,32 @@ namespace nwc2ly
 			WriteLn("{");
 			if (args.Length > 1)
 			{
-				if (args[2] == "Up")
+				if (DynamicsDirection == "Up")
 				{
-					WriteLn("\\autoBeamOff");
+					if (!autoBeam)
+					{
+						WriteLn("\\autoBeamOff");
+					}
 					// WriteLn("\\override MultiMeasureRest #'staff-position = #0");
 					WriteLn("\\override MultiMeasureRest #'expand-limit = #1");
 					WriteLn(" \\accidentalStyle \"modern-voice-cautionary\"");
 				}
 				else
 				{
-					WriteLn("\\autoBeamOff");
+					if (!autoBeam)
+					{
+						WriteLn("\\autoBeamOff");
+					}
 					WriteLn(" \\accidentalStyle \"piano-cautionary\"");
 				}
 			}
-			if (args.Length > 2)
+			if (AccChecked)
 			{
-				if (args[3] == "True")
-				{
-					UseAcc = true;
-				}
-				else
-				{
-					UseAcc = false;
-				}
+				UseAcc = true;
+			}
+			else
+			{
+				UseAcc = false;
 			}
 
 			CurClef = "treble";
@@ -1303,7 +1334,7 @@ namespace nwc2ly
 
 			if (args.Length > 0)
 			{
-				OutFile = new StreamWriter(args[1], false);
+				OutFile = new StreamWriter(outputFile, false);
 				Console.SetOut(OutFile);
 				Console.Out.Write(Output);
 				OutFile.Close();
@@ -1313,7 +1344,7 @@ namespace nwc2ly
 				}
 				if (!VoiceHidden)
 				{
-					FileInfo LyOutFile = new FileInfo(args[1]);
+					FileInfo LyOutFile = new FileInfo(outputFile);
 					string DynFile = LyOutFile.DirectoryName + "\\" + LyOutFile.Name.Replace(LyOutFile.Extension, "Dyn.ly");
 					OutFile = new StreamWriter(DynFile, false);
 					OutDyn += @" \!"; //Don't think it can harm to add terminator at end.
@@ -1586,7 +1617,7 @@ namespace nwc2ly
 		}
 		public static void CheckHairType(string Startstring, string ThisHair, string OtherHair, ref bool ThisAlready, ref bool OtherAlready)
 		{
-			Regex Spacers = new Regex("s[0-9]{1,3}[\\.]?");
+			Regex Spacers = new Regex("s[0-9]{1,3}[\\.]*");
 			Regex Dynamics = new Regex("[\\\\mfp]{2,4}");
 			Match LastSpacer;
 			Match PenSpacer;
