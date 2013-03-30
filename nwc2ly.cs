@@ -145,7 +145,7 @@ namespace nwc2ly
 		private static bool FermataIsUp;
 		private static bool LastCommandWasBarline;
 		private static string GraceType = "";
-		private static bool VoiceHidden;
+		private static bool VoiceHidden = false;
 		private static string OutputFilename = "";
 		private static string OutDyn = "";
 
@@ -196,7 +196,7 @@ namespace nwc2ly
 					inputFile = args[0];
 					break;
 			}
-
+			VoiceHidden = false;
 			if (StaffAboveLayered)
 			{
 				VoiceHidden = true;
@@ -747,6 +747,11 @@ namespace nwc2ly
 							{
 								WriteLn(@" \once \override Score.RehearsalMark #'self-alignment-X = #RIGHT");
 								WriteLn("\\mark \\markup { \"To coda  \" \\musicglyph #\"scripts.coda\"}");
+							}
+							else if (s1 == "Fine")
+							{
+								WriteLn(@" \once \override Score.RehearsalMark #'self-alignment-X = #RIGHT");
+								WriteLn("\\mark \\markup { \"Fine\" }");
 							}
 							else
 							{
@@ -1349,6 +1354,7 @@ namespace nwc2ly
 					OutFile = new StreamWriter(DynFile, false);
 					OutDyn += @" \!"; //Don't think it can harm to add terminator at end.
 					OutFile.Write(OutDyn);
+					OutFile.Flush();
 					OutFile.Close();
 				}
 			}
@@ -1902,7 +1908,10 @@ namespace nwc2ly
 				}
 				if (Tremolo)
 				{
-					OutDyn += "s" + s3 + " ";
+					if (CountBars)
+					{
+						OutDyn += "s" + s3 + " ";
+					}
 					int NewNoteLength = 4;
 					try
 					{
@@ -1927,11 +1936,17 @@ namespace nwc2ly
 					if (Grace)
 					{
 						Write(" } ");
-						OutDyn += " } ";
+						if (CountBars)
+						{
+							OutDyn += " } ";
+						}
 						Grace = false;
 					}
 					Write("\\times 2/3 { ");
-					OutDyn += "\\times 2/3 { ";
+					if (CountBars)
+					{
+						OutDyn += "\\times 2/3 { ";
+					}
 				}
 				if (Grace)
 				{
@@ -1943,7 +1958,10 @@ namespace nwc2ly
 							afterGrace = false;
 						}
 						Write(" } ");
-						OutDyn += " } ";
+						if (CountBars)
+						{
+							OutDyn += " } ";
+						}
 						Grace = false;
 					}
 				}
@@ -1958,19 +1976,28 @@ namespace nwc2ly
 						if (GraceType.Length > 0)
 						{
 							Write(" \\" + GraceType + " { ");
-							OutDyn += " \\" + GraceType + " { ";
+							if (CountBars)
+							{
+								OutDyn += " \\" + GraceType + " { ";
+							}
 						}
 						else
 						{
 							if (UseAcc)
 							{
 								Write(" \\acciaccatura { ");
-								OutDyn += " \\acciaccatura { ";
+								if (CountBars)
+								{
+									OutDyn += " \\acciaccatura { ";
+								}
 							}
 							else
 							{
 								Write(" \\grace { ");
-								OutDyn += " \\grace { ";
+								if (CountBars)
+								{
+									OutDyn += " \\grace { ";
+								}
 							}
 						}
 					}
@@ -2073,7 +2100,10 @@ namespace nwc2ly
 				Write(s3); // This is where the note duration is written
 				if (!Tremolo)
 				{
-					OutDyn += "s" + s3 + " ";
+					if (CountBars)
+					{
+						OutDyn += "s" + s3 + " ";
+					}
 				}
 				if (TremSingle)
 				{
@@ -2171,7 +2201,6 @@ namespace nwc2ly
 			// Need to write dynamics after note, before "closing" triplets
 			if (Dyn != "")
 			{
-				//Write(Dyn + ' ');
 				OutDyn += Dyn + " ";
 				Dyn = "";
 			}
@@ -2185,7 +2214,10 @@ namespace nwc2ly
 			if (Line.IndexOf("Triplet=End") > 0)
 			{
 				Write(" } ");
-				OutDyn += " } ";
+				if (CountBars)
+				{
+					OutDyn += " } ";
+				}
 			}
 		}
 		private static string GetColour()
@@ -2262,7 +2294,10 @@ namespace nwc2ly
 			if (Line.IndexOf("Triplet=First") >= 0)
 			{
 				Write("\\times 2/3 { ");
-				OutDyn += "\\times 2/3 { ";
+				if (CountBars)
+				{
+					OutDyn += "\\times 2/3 { ";
+				}
 			}
 			if (HideNote)
 			{
@@ -2274,17 +2309,26 @@ namespace nwc2ly
 				if (Line.IndexOf("Grace") >= 0)
 				{
 					Write(@"\grace "); // Grace skips
-					OutDyn += @"\grace ";
+					if (CountBars)
+					{
+						OutDyn += @"\grace ";
+					}
 				}
 				if (s1 == "1")
 				{
 					Write(" s1*" + TimeSig + " ");
-					OutDyn += "s1*" + TimeSig + " ";
+					if (CountBars)
+					{
+						OutDyn += "s1*" + TimeSig + " ";
+					}
 				}
 				else
 				{
 					Write(" s" + s1 + " ");  // This ensures that hidden rests still have a time value
-					OutDyn += "s" + s1 + " ";
+					if (CountBars)
+					{
+						OutDyn += "s" + s1 + " ";
+					}
 				}
 				LastRestWasWhole = false;
 			}
@@ -2336,7 +2380,10 @@ namespace nwc2ly
 					{
 						Write(NoteEquiv + s1 + @"\rest ");
 					}
-					OutDyn += "s" + s1 + " ";
+					if (CountBars)
+					{
+						OutDyn += "s" + s1 + " ";
+					}
 					LastRestWasWhole = false;
 				}
 			}
@@ -2368,7 +2415,10 @@ namespace nwc2ly
 			if (Line.IndexOf("Triplet=End") > 0)
 			{
 				Write(" } ");
-				OutDyn += " } ";
+				if (CountBars)
+				{
+					OutDyn += " } ";
+				}
 			}
 			Last = "";
 		}
