@@ -148,6 +148,10 @@ namespace nwc2ly
 		private static bool VoiceHidden = false;
 		private static string OutputFilename = "";
 		private static string OutDyn = "";
+		private static int DynamicSpacing;
+		private static int TupletKeepCount = -1;
+		private static int TupletDropCount = -1;
+		private static bool TupletEnded = false;
 
 		[STAThread]
 		public static void Main(string[] args)
@@ -177,6 +181,9 @@ namespace nwc2ly
 
 			switch (args.Length)
 			{
+				case 7:
+					DynamicSpacing = int.Parse(args[6]);
+					goto case 6;
 				case 6:
 					autoBeam = bool.Parse(args[5]);
 					goto case 5;
@@ -400,6 +407,7 @@ namespace nwc2ly
 				if (Line.IndexOf("DebugPoint") > -1)
 				{
 				}
+
 				bBarWritten = false;
 				Last = Line;
 				Cmd = GetCommand(ref Line);
@@ -939,14 +947,18 @@ namespace nwc2ly
 								{
 									Scalefactor = (Decimal)2 / 3;
 									Write(@" \times 3/2 { ");
+									OutDyn += @" \times 3/2 { ";
 								}
 								else if (s1.IndexOf("dupletOff") == 0)
 								{
 									Scalefactor = (Decimal)1;
 									Write(" } ");
+									OutDyn += " } ";
 								}
-								else if (s1.IndexOf("tupletOn") == 0)
+								else if (s1.IndexOf("tuplet") == 0)
 								{
+									// Tuplet works by scaling the first Numerator notes to fit in Denominator and
+									// then dropping the last Denominator - Numerator rests - notes will make it explode
 									Decimal Numerator = 1;
 									Decimal Denominator = 1; ;
 									Match DoubleParam = FindDoubleParam.Match(s1);
@@ -962,15 +974,12 @@ namespace nwc2ly
 									else
 									{
 										WriteLn("  % Error");
-										WriteLn("#(ly:warning \"Error in parameter extraction for tupletOn command \")");
+										WriteLn("#(ly:warning \"Error in parameter extraction for tuplet command \")");
 									}
-									Scalefactor = Denominator / Numerator;
-									Write(@" \times " + Numerator + "/" + Denominator + " { ");
-								}
-								else if (s1.IndexOf("tupletOff") == 0)
-								{
-									Scalefactor = (Decimal)1;
-									Write(" } ");
+									Write(@" \tuplet " + Numerator + "/" + Denominator + " { ");
+									OutDyn += @" \tuplet " + Numerator + "/" + Denominator + " { ";
+									TupletKeepCount = (int)Numerator;
+									TupletDropCount = (int)Denominator - TupletKeepCount;
 								}
 								else if (s1.IndexOf("ossiaStave") == 0)
 								{
@@ -1284,6 +1293,11 @@ namespace nwc2ly
 										}
 									}
 								}
+								else if (s1.IndexOf("dynCom") >= 0)
+								{
+									string DynCom = s1.Replace("dynCom", "");
+									OutDyn += DynCom;
+								}
 							}
 						}
 					}
@@ -1307,6 +1321,13 @@ namespace nwc2ly
 						}
 					}
 				}
+				if (TupletEnded)
+				{
+					Write(" } ");
+					OutDyn += " } ";
+					TupletEnded = false;
+				}
+
 			} while (InputList.Count > 0);
 			CheckHairCresc();
 			if (AddedText != "")
@@ -1596,7 +1617,7 @@ namespace nwc2ly
 		{
 			string Dots = "";
 			string RetVal = "";
-			int SpacerLen = 256;
+			int SpacerLen = (int) Math.Pow(2, DynamicSpacing);
 			if (ThisDur.IndexOf("..") > -1)
 			{
 				Dots = "..";
@@ -1609,10 +1630,21 @@ namespace nwc2ly
 			}
 			int DurVal = int.Parse(ThisDur);
 			int Reps = SpacerLen / DurVal - 2;
-			if (Reps > 62)
+			if (Reps < 2)
 			{
 			}
-			RetVal = @"\repeat unfold " + Reps.ToString() + @" { s" + SpacerLen.ToString() + Dots + @" } s" + SpacerLen.ToString() + Dots + @" \! s" + SpacerLen.ToString() + Dots + " ";
+			if (Reps > 1)
+			{
+				RetVal = @"\repeat unfold " + Reps.ToString() + @" { s" + SpacerLen.ToString() + Dots + @" } s" + SpacerLen.ToString() + Dots + @" \! s" + SpacerLen.ToString() + Dots + " ";
+			}
+			else if (Reps == 0)
+			{
+				RetVal = @"s" + SpacerLen.ToString() + Dots + @" \! s" + SpacerLen.ToString() + Dots + " ";
+			}
+			else
+			{
+				RetVal = @"s" + DurVal.ToString() + Dots;
+			}
 			return RetVal;
 		}
 		public static void CheckHairCresc()
@@ -2289,6 +2321,7 @@ namespace nwc2ly
 			s1 = GetPar("Dur", Line);
 			s2 = "";
 			s1 = GetDur(s1, Line);
+			if (s1 == "") return;
 			string opts = GetPar("Opts", Line, true);
 
 			if (Line.IndexOf("Triplet=First") >= 0)
@@ -2429,11 +2462,28 @@ namespace nwc2ly
 		private static string GetDur(string Dur, string LocalLine, bool ReturnNumberOnly)
 		{
 			string ReturnVal = "";
-			if (Dur.IndexOf("Whole") >= 0)
+			if (TupletKeepCount == 0)
+			{
+				TupletDropCount--;
+				if (TupletDropCount == 0)
+				{
+					TupletKeepCount = -1;
+					TupletDropCount = -1;
+					TupletEnded = true;
+					return ReturnVal;
+				}
+			}
+
+			if (TupletKeepCount > 0)
+			{
+				TupletKeepCount--;
+			}
+
+			if (Dur.IndexOf("Whole") > -1)
 			{
 				ReturnVal = "1";
 			}
-			else if (Dur.IndexOf("Half") >= 0)
+			else if (Dur.IndexOf("Half") > -1)
 			{
 				ReturnVal = "2";
 			}
@@ -2445,11 +2495,11 @@ namespace nwc2ly
 			ReturnVal = ReturnVal.Replace("nd", "");
 			ReturnVal = ReturnVal.Replace("rd", "");
 			ReturnVal = ReturnVal.Replace("th", "");
-			if (LocalLine.IndexOf("DblDotted") >= 0)
+			if (LocalLine.IndexOf("DblDotted") > -1)
 			{
 				ReturnVal += "..";
 			}
-			else if (LocalLine.IndexOf("Dotted") >= 0)
+			else if (LocalLine.IndexOf("Dotted") > -1)
 			{
 				if (Scalefactor != (Decimal)2 / 3)
 				{
