@@ -170,7 +170,7 @@ namespace nwc2ly
 			Scalefactor = 1;
 			FermataIsUp = true;
 			LastCommandWasBarline = true;
-			OutDyn = "";
+			OutDyn = "\\override DynamicTextSpanner.style = #'none \r\n";
 
 			string inputFile = "";
 			string outputFile = "";
@@ -550,17 +550,17 @@ namespace nwc2ly
 							s1 = GetPar("Signature", Line);
 							if (s1 == "Common")
 							{
-								WriteLn(@"\defaultTimeSignature");
+								WriteLn(@" \defaultTimeSignature");
 								s1 = "4/4";
 							}
 							else if (s1 == "AllaBreve")
 							{
-								WriteLn(@"\defaultTimeSignature");
+								WriteLn(@" \defaultTimeSignature");
 								s1 = "2/2";
 							}
 							else
 							{
-								WriteLn(@"\numericTimeSignature");
+								WriteLn(@" \numericTimeSignature");
 							}
 							WriteLn(" \\time " + s1);
 							OutDyn += " \\time " + s1 + " ";
@@ -694,7 +694,7 @@ namespace nwc2ly
 						{
 							s1 = GetPar("Style", Line);
 							string Location = GetPosChar(Line);
-							AddedText += Location + "\\markup {\\small \\italic \"" + s1 + "\"}";
+							AddedText += Location + "\\markup {\\huge \\italic \"" + s1 + "\"}";
 						}
 
 						else if (Cmd == "SustainPedal")
@@ -811,6 +811,16 @@ namespace nwc2ly
 				else
 				{
 					// Non-visible notation
+					if (Cmd == "Bar")
+					{
+						LastCommandWasBarline = true;
+						WriteLn("");
+						WriteLn(@"  \applyContext #(lambda (c) % Subtract 1 from measure number");
+						WriteLn(@"  (set! (ly:context-property");
+						WriteLn(@"    (ly:context-find c 'Timing)");
+						WriteLn(@"    'currentBarNumber)");
+						WriteLn(@"    (1- (ly:context-property c 'currentBarNumber))))");
+					}
 					if (Cmd == "Text")
 					{
 						s1 = GetPar("Text", Line, true);
@@ -872,7 +882,7 @@ namespace nwc2ly
 									CheckHairCresc();
 									if (bInDynVar)
 									{
-										Write (@" <>\! ");
+										Write(@" <>\! ");
 										bInDynVar = false;
 									}
 									WriteLn(" }");
@@ -924,354 +934,338 @@ namespace nwc2ly
 						if ((OssiaStave && InOssia) || !OssiaStave)
 						{
 							// Hidden text
+							if (s1.IndexOf("##") == 0)
 							{
-								if (s1.IndexOf("##") == 0)
-								{
-									if (s1.IndexOf(@"##\mark") == 0)
-										if (s1.IndexOf(@"##\markup") == -1)
-										{
-											{ // Special case needed to reset mark position - see fermata on barline
-												WriteLn("");
-												WriteLn(@" \revert Score.RehearsalMark #'direction");
-											}
+								if (s1.IndexOf(@"##\mark") == 0)
+									if (s1.IndexOf(@"##\markup") == -1)
+									{
+										{ // Special case needed to reset mark position - see fermata on barline
+											WriteLn("");
+											WriteLn(@" \revert Score.RehearsalMark #'direction");
 										}
-									s1 = s1.Substring(2);
-									Write(" " + s1 + " ");
-								}
-								else if (s1.IndexOf("graceSpace") == 0)
-								{
-									OutDyn += " \\grace s8";
-									Write(" \\grace s8 ");
-								}
-								else if (s1.IndexOf("dupletOn") == 0)
-								{
-									Scalefactor = (Decimal)2 / 3;
-									Write(@" \times 3/2 { ");
-									OutDyn += @" \times 3/2 { ";
-								}
-								else if (s1.IndexOf("dupletOff") == 0)
-								{
-									Scalefactor = (Decimal)1;
-									Write(" } ");
-									OutDyn += " } ";
-								}
-								else if (s1.IndexOf("tuplet") == 0)
-								{
-									// Tuplet works by scaling the first Numerator notes to fit in Denominator and
-									// then dropping the last Denominator - Numerator rests - notes will make it explode
-									Decimal Numerator = 1;
-									Decimal Denominator = 1; ;
-									Match DoubleParam = FindDoubleParam.Match(s1);
-									if (DoubleParam.Success)
-									{
-										try
-										{
-											Numerator = Decimal.Parse(DoubleParam.Result("$1"));
-											Denominator = Decimal.Parse(DoubleParam.Result("$2"));
-										}
-										catch { }
 									}
-									else
+								s1 = s1.Substring(2);
+								Write(" " + s1 + " ");
+							}
+							else if (s1.IndexOf("!!") == 0)
+							{
+								// Dynamics commands
+								s1 = s1.Substring(2);
+								OutDyn += " " + s1 + " ";
+							}
+							else if (s1.IndexOf("graceSpace") == 0)
+							{
+								OutDyn += " \\grace s8";
+								Write(" \\grace s8 ");
+							}
+							else if (s1.IndexOf("dupletOn") == 0)
+							{
+								Scalefactor = (Decimal)2 / 3;
+								Write(@" \times 3/2 { ");
+								OutDyn += @" \times 3/2 { ";
+							}
+							else if (s1.IndexOf("dupletOff") == 0)
+							{
+								Scalefactor = (Decimal)1;
+								Write(" } ");
+								OutDyn += " } ";
+							}
+							else if (s1.IndexOf("tuplet") == 0)
+							{
+								// Tuplet works by scaling the first Numerator notes to fit in Denominator and
+								// then dropping the last Denominator - Numerator rests - notes will make it explode
+								Decimal Numerator = 1;
+								Decimal Denominator = 1; ;
+								Match DoubleParam = FindDoubleParam.Match(s1);
+								if (DoubleParam.Success)
+								{
+									try
 									{
-										WriteLn("  % Error");
-										WriteLn("#(ly:warning \"Error in parameter extraction for tuplet command \")");
+										Numerator = Decimal.Parse(DoubleParam.Result("$1"));
+										Denominator = Decimal.Parse(DoubleParam.Result("$2"));
 									}
-									Write(@" \tuplet " + Numerator + "/" + Denominator + " { ");
-									OutDyn += @" \tuplet " + Numerator + "/" + Denominator + " { ";
-									TupletKeepCount = (int)Numerator;
-									TupletDropCount = (int)Denominator - TupletKeepCount;
+									catch { }
 								}
-								else if (s1.IndexOf("ossiaStave") == 0)
+								else
 								{
-									OssiaStave = true;
-									Output = "";
-									WriteLn("%OssiaStave");
+									WriteLn("  % Error");
+									WriteLn("#(ly:warning \"Error in parameter extraction for tuplet command \")");
 								}
-								else if (s1.IndexOf("ossiaIncludeEnd") == 0)  // The order of these is important, since ossiaIncludeEnd starts with ossiaInclude
+								Write(@" \tuplet " + Numerator + "/" + Denominator + " { ");
+								OutDyn += @" \tuplet " + Numerator + "/" + Denominator + " { ";
+								TupletKeepCount = (int)Numerator;
+								TupletDropCount = (int)Denominator - TupletKeepCount;
+							}
+							else if (s1.IndexOf("ossiaStave") == 0)
+							{
+								OssiaStave = true;
+								Output = "";
+								WriteLn("%OssiaStave");
+							}
+							else if (s1.IndexOf("ossiaIncludeEnd") == 0)  // The order of these is important, since ossiaIncludeEnd starts with ossiaInclude
+							{
+								WriteLn(" } ");
+								for (int l = 0; l < OssiaName.Length; l++)
 								{
-									WriteLn(" } ");
-									for (int l = 0; l < OssiaName.Length; l++)
+									string FlagStaff = "";
+									if (l == 0) FlagStaff = " Staff ";
+									WriteLn("%" + OssiaName[l] + "Music");
+									WriteLn("%" + OssiaName[l] + "Lyrics");
+									int FileStartPos = Output.IndexOf("%StartMarker");
+									Output = Output.Insert(FileStartPos, "%OssiaInclude " + OssiaName[l] + FlagStaff + "\r\n");
+									if (l == 0) l++; //Skip stave name
+								}
+								WriteLn(">>");
+								NextText = "";
+							}
+							else if (s1.IndexOf("ossiaInclude") == 0)
+							{
+								Match DoubleParam = FindDoubleParam.Match(s1);
+								if (DoubleParam.Success)
+								{
+									OssiaName = new string[1];
+									OssiaName[0] = DoubleParam.Result("$1");
+									ThisStave = DoubleParam.Result("$2");
+									WriteLn(" << { ");
+								}
+								else
+								{
+									Match MultiParam = FindMultiParam.Match(s1);
+									if (MultiParam.Success)
 									{
-										string FlagStaff = "";
-										if (l == 0) FlagStaff = " Staff ";
-										WriteLn("%" + OssiaName[l] + "Music");
-										WriteLn("%" + OssiaName[l] + "Lyrics");
-										int FileStartPos = Output.IndexOf("%StartMarker");
-										Output = Output.Insert(FileStartPos, "%OssiaInclude " + OssiaName[l] + FlagStaff + "\r\n");
-										if (l == 0) l++; //Skip stave name
-									}
-									WriteLn(">>");
-									NextText = "";
-								}
-								else if (s1.IndexOf("ossiaInclude") == 0)
-								{
-									Match DoubleParam = FindDoubleParam.Match(s1);
-									if (DoubleParam.Success)
-									{
-										OssiaName = new string[1];
-										OssiaName[0] = DoubleParam.Result("$1");
-										ThisStave = DoubleParam.Result("$2");
+										string OssiaParams = MultiParam.Value;
+										OssiaParams = OssiaParams.Replace("(", "");
+										OssiaParams = OssiaParams.Replace(")", "");
+										OssiaName = OssiaParams.Split(',');
+										ThisStave = OssiaName[1];
 										WriteLn(" << { ");
 									}
 									else
 									{
-										Match MultiParam = FindMultiParam.Match(s1);
-										if (MultiParam.Success)
-										{
-											string OssiaParams = MultiParam.Value;
-											OssiaParams = OssiaParams.Replace("(", "");
-											OssiaParams = OssiaParams.Replace(")", "");
-											OssiaName = OssiaParams.Split(',');
-											ThisStave = OssiaName[1];
-											WriteLn(" << { ");
-										}
-										else
-										{
-											WriteLn("  % Error");
-											WriteLn("#(ly:warning \"Error in parameter extraction for ossiaInclude command \")");
-										}
+										WriteLn("  % Error");
+										WriteLn("#(ly:warning \"Error in parameter extraction for ossiaInclude command \")");
 									}
 								}
-								else if (s1.IndexOf("crossStaffOn") > -1)
+							}
+							else if (s1.IndexOf("crossStaffOn") > -1)
+							{
+								WriteLn(@" \crossStaff { ");
+							}
+							else if (s1.IndexOf("crossStaffOff") > -1)
+							{
+								Write(@" } ");
+							}
+							else if (s1.IndexOf("cadenzaOn") > -1)
+							{
+								InCadenza = true;
+								Write(@" \cadenzaOn ");
+							}
+							else if (s1.IndexOf("cadenzaOff") > -1)
+							{
+								InCadenza = false;
+								Write(@" \cadenzaOff");
+							}
+							else if (s1.IndexOf("endRepeat") == 0)
+							{
+								Write(@" \set Score.repeatCommands = #'((volta #f)) ");
+								bInEnding = false;
+							}
+							else if (s1.IndexOf("phraseOn") == 0)
+							{
+								AddedText += @" \(";
+							}
+							else if (s1.IndexOf("phraseOff") == 0)
+							{
+								AddedText += @" \)";
+							}
+							else if (s1.IndexOf("ignoreBeams") == 0)
+							{
+								WriteLn("\\set melismaBusyProperties = #'(melismaBusy slurMelismaBusy tieMelismaBusy completionBusy)");
+							}
+							else if (s1.IndexOf("accidentalsOn") == 0)
+							{
+								ShowAccidentals = true;
+								Match SingleParam = FindSingleParam.Match(s1);
+								if (SingleParam.Success)
 								{
-									Match ParamMatch = FindSingleParam.Match(s1);
-									string StemLength = ParamMatch.Result("$1");
-									WriteLn(@"\override Stem #'cross-staff = ##t");
-									WriteLn(@"\override Flag #'style = #'no-flag");
-									WriteLn(@"\override Stem #'length = #" + StemLength);
+									WhichNoteIsAccidental = SingleParam.Result("$1");
 								}
-								else if (s1.IndexOf("crossStaffOff") > -1)
+								else
 								{
-									WriteLn(@"\override Stem #'cross-staff = ##f");
-									WriteLn(@"\revert Stem #'flag-style");
-									WriteLn(@"\revert Stem #'length");
-								}
-								else if (s1.IndexOf("crossStaff") > -1)
-								{
-									Match ParamMatch = FindSingleParam.Match(s1);
-									string StemLength = ParamMatch.Result("$1");
-									WriteLn(@"\once \override Stem #'cross-staff = ##t");
-									// WriteLn(@"\once \override NoteColumn #'ignore-collision = ##t");
-									WriteLn(@"\once \override Flag #'style = #'no-flag");
-									WriteLn(@"\once \override Stem #'length = #" + StemLength);
-								}
-								else if (s1.IndexOf("cadenzaOn") > -1)
-								{
-									InCadenza = true;
-									Write(@" \cadenzaOn ");
-								}
-								else if (s1.IndexOf("cadenzaOff") > -1)
-								{
-									InCadenza = false;
-									Write(@" \cadenzaOff");
-								}
-								else if (s1.IndexOf("endRepeat") == 0)
-								{
-									Write(@" \set Score.repeatCommands = #'((volta #f)) ");
-									bInEnding = false;
-								}
-								else if (s1.IndexOf("phraseOn") == 0)
-								{
-									AddedText += @" \(";
-								}
-								else if (s1.IndexOf("phraseOff") == 0)
-								{
-									AddedText += @" \)";
-								}
-								else if (s1.IndexOf("ignoreBeams") == 0)
-								{
-									WriteLn("\\set melismaBusyProperties = #'(melismaBusy slurMelismaBusy tieMelismaBusy completionBusy)");
-								}
-								else if (s1.IndexOf("accidentalsOn") == 0)
-								{
-									ShowAccidentals = true;
-									Match SingleParam = FindSingleParam.Match(s1);
-									if (SingleParam.Success)
-									{
-										WhichNoteIsAccidental = SingleParam.Result("$1");
-									}
-									else
-									{
-										WhichNoteIsAccidental = "";
-									}
-
-								}
-								else if (s1.IndexOf("accidentalsOff") == 0)
-								{
-									ShowAccidentals = false;
 									WhichNoteIsAccidental = "";
 								}
-								else if (s1.IndexOf("cautionaryOn") == 0)
-								{
-									ShowCautionaries = true;
-								}
-								else if (s1.IndexOf("cautionaryOff") == 0)
-								{
-									ShowCautionaries = false;
-								}
-								else if (s1.IndexOf("caesuraFermata") == 0)
-								{
-									WriteLn("");
-									WriteLn(@"  \once \override BreathingSign #'text = ");
-									WriteLn(@"  \markup { ");
-									WriteLn(@"    \line {");
-									WriteLn("      \\musicglyph #\"scripts.caesura.straight\"");
-									WriteLn("      \\translate #'(-1.75 . 1.6)");
-									WriteLn("      \\musicglyph #\"scripts.ufermata\"");
-									WriteLn("    }");
-									WriteLn("  }");
-								}
-								else if (s1.IndexOf("tickMark") == 0)
-								{
-									WriteLn("");
-									WriteLn(@"\once \override BreathingSign.Y-offset = #2.6");
-									WriteLn("\\once \\override BreathingSign.text = \\markup { \\musicglyph #\"scripts.tickmark\" } ");
-								}
-								else if (s1.IndexOf("tremoloOn") == 0)
-								{
-									Tremolo = true;
-									TremoloStart = true;
-									Match TremParam = FindTremParam.Match(s1);
-									TremValue = 4;
-									if (TremParam.Success)
-									{
-										TremValue = int.Parse(TremParam.Result("$1"));
-									}
-								}
-								else if (s1.IndexOf("tremoloSingle") == 0)
-								{
-									Match TremSingleParam = FindTremParam.Match(s1);
-									if (TremSingleParam.Success)
-									{
-										TremValue = int.Parse(TremSingleParam.Result("$1"));
-										TremSingle = true;
-									}
-									else
-									{
-										WriteLn("  % Error");
-										WriteLn("#(ly:warning \"Error in parameter extraction for tremoloSingle command \")");
-									}
-								}
-								else if (s1.IndexOf("tremoloOff") == 0)
-								{
-									Tremolo = false;
-									TremSingle = false;
-								}
-								else if (s1.IndexOf("accOn") == 0)
-								{
-									UseAcc = true;
-								}
-								else if (s1.IndexOf("accOff") == 0)
-								{
-									UseAcc = false;
-								}
-								else if (s1.IndexOf("multiLyric") == 0)
-								{
-									//WriteLn("\\override Rest #'staff-position = #0");
-									WriteLn("\\override NoteColumn #'ignore-collision = ##t");
-								}
-								else if (s1.IndexOf("afterGrace") == 0)
-								{
-									afterGrace = true;
-									Write("\\afterGrace ");
-								}
-								else if (s1.IndexOf("scaleDurationsOn") == 0)
-								{
-									string FirstParam, SecondParam = "";
-									int Numerator, Denominator, TSNum, TSDen;
-									Match DoubleParam = FindDoubleParam.Match(s1);
-									if (DoubleParam.Success)
-									{
-										FirstParam = DoubleParam.Result("$1");
-										SecondParam = DoubleParam.Result("$2");
-										try
-										{
-											Numerator = int.Parse(FirstParam);
-											Denominator = int.Parse(SecondParam);
-											int TSSlash = TimeSig.IndexOf('/');
-											TSNum = int.Parse(TimeSig.Substring(0, TSSlash));
-											TSDen = int.Parse(TimeSig.Substring(TSSlash + 1));
-											Scalefactor = (Decimal)(Numerator * TSDen) / (Denominator * TSNum);
-											WriteLn(@"\set Staff.timeSignatureFraction = #'(" + Numerator + " . " + Denominator + ")");
-											WriteLn(@"\scaleDurations #'(" + (TSNum * Denominator).ToString() + " . " + (TSDen * Numerator).ToString() + ") { ");
-										}
-										catch
-										{
-										}
-									}
-									else
-									{
-										WriteLn("  % Error");
-										WriteLn("#(ly:warning \" Error in parameter extraction for scaleDurationsOn command\")");
-									}
-								}
-								else if (s1.IndexOf("scaleDurationsOff") == 0)
-								{
-									Scalefactor = 1;
-									WriteLn(" } ");
-									int TSSlash = TimeSig.IndexOf('/');
-									int TSNum = int.Parse(TimeSig.Substring(0, TSSlash));
-									int TSDen = int.Parse(TimeSig.Substring(TSSlash + 1));
-									WriteLn(@"\set Staff.timeSignatureFraction = #'(" + TSNum + " . " + TSDen + ")");
-								}
-								else if (s1.IndexOf("grace") == 0)
-								{
-									Match SingleParam = FindSingleParam.Match(s1);
-									if (SingleParam.Success)
-									{
-										string GraceVal = SingleParam.Result("$1");
-										switch (GraceVal)
-										{
-											case "grace":
-												GraceType = "grace";
-												break;
-											case "slash":
-												GraceType = "slashedGrace";
-												break;
-											case "acc":
-												GraceType = "acciaccatura";
-												break;
-											case "ap":
-												GraceType = "appoggiatura";
-												break;
-											default:
-												GraceType = "";
-												break;
-										}
 
+							}
+							else if (s1.IndexOf("accidentalsOff") == 0)
+							{
+								ShowAccidentals = false;
+								WhichNoteIsAccidental = "";
+							}
+							else if (s1.IndexOf("cautionaryOn") == 0)
+							{
+								ShowCautionaries = true;
+							}
+							else if (s1.IndexOf("cautionaryOff") == 0)
+							{
+								ShowCautionaries = false;
+							}
+							else if (s1.IndexOf("caesuraFermata") == 0)
+							{
+								WriteLn("");
+								WriteLn(@"  \once \override BreathingSign #'text = ");
+								WriteLn(@"  \markup { ");
+								WriteLn(@"    \line {");
+								WriteLn("      \\musicglyph #\"scripts.caesura.straight\"");
+								WriteLn("      \\translate #'(-1.75 . 1.6)");
+								WriteLn("      \\musicglyph #\"scripts.ufermata\"");
+								WriteLn("    }");
+								WriteLn("  }");
+							}
+							else if (s1.IndexOf("tickMark") == 0)
+							{
+								WriteLn("");
+								WriteLn(@"\once \override BreathingSign.Y-offset = #2.6");
+								WriteLn("\\once \\override BreathingSign.text = \\markup { \\musicglyph #\"scripts.tickmark\" } ");
+							}
+							else if (s1.IndexOf("tremoloOn") == 0)
+							{
+								Tremolo = true;
+								TremoloStart = true;
+								Match TremParam = FindTremParam.Match(s1);
+								TremValue = 4;
+								if (TremParam.Success)
+								{
+									TremValue = int.Parse(TremParam.Result("$1"));
+								}
+							}
+							else if (s1.IndexOf("tremoloSingle") == 0)
+							{
+								Match TremSingleParam = FindTremParam.Match(s1);
+								if (TremSingleParam.Success)
+								{
+									TremValue = int.Parse(TremSingleParam.Result("$1"));
+									TremSingle = true;
+								}
+								else
+								{
+									WriteLn("  % Error");
+									WriteLn("#(ly:warning \"Error in parameter extraction for tremoloSingle command \")");
+								}
+							}
+							else if (s1.IndexOf("tremoloOff") == 0)
+							{
+								Tremolo = false;
+								TremSingle = false;
+							}
+							else if (s1.IndexOf("accOn") == 0)
+							{
+								UseAcc = true;
+							}
+							else if (s1.IndexOf("accOff") == 0)
+							{
+								UseAcc = false;
+							}
+							else if (s1.IndexOf("multiLyric") == 0)
+							{
+								//WriteLn("\\override Rest #'staff-position = #0");
+								WriteLn("\\override NoteColumn #'ignore-collision = ##t");
+							}
+							else if (s1.IndexOf("afterGrace") == 0)
+							{
+								afterGrace = true;
+								Write("\\afterGrace ");
+							}
+							else if (s1.IndexOf("scaleDurationsOn") == 0)
+							{
+								string FirstParam, SecondParam = "";
+								int Numerator, Denominator, TSNum, TSDen;
+								Match DoubleParam = FindDoubleParam.Match(s1);
+								if (DoubleParam.Success)
+								{
+									FirstParam = DoubleParam.Result("$1");
+									SecondParam = DoubleParam.Result("$2");
+									try
+									{
+										Numerator = int.Parse(FirstParam);
+										Denominator = int.Parse(SecondParam);
+										int TSSlash = TimeSig.IndexOf('/');
+										TSNum = int.Parse(TimeSig.Substring(0, TSSlash));
+										TSDen = int.Parse(TimeSig.Substring(TSSlash + 1));
+										Scalefactor = (Decimal)(Numerator * TSDen) / (Denominator * TSNum);
+										WriteLn(@"\set Staff.timeSignatureFraction = #'(" + Numerator + " . " + Denominator + ")");
+										WriteLn(@"\scaleDurations #'(" + (TSNum * Denominator).ToString() + " . " + (TSDen * Numerator).ToString() + ") { ");
+									}
+									catch
+									{
 									}
 								}
-								else if (s1.IndexOf("setSlur") == 0)
+								else
 								{
-									if (s1.IndexOf("setSlurComplex") == 0)
+									WriteLn("  % Error");
+									WriteLn("#(ly:warning \" Error in parameter extraction for scaleDurationsOn command\")");
+								}
+							}
+							else if (s1.IndexOf("scaleDurationsOff") == 0)
+							{
+								Scalefactor = 1;
+								WriteLn(" } ");
+								int TSSlash = TimeSig.IndexOf('/');
+								int TSNum = int.Parse(TimeSig.Substring(0, TSSlash));
+								int TSDen = int.Parse(TimeSig.Substring(TSSlash + 1));
+								WriteLn(@"\set Staff.timeSignatureFraction = #'(" + TSNum + " . " + TSDen + ")");
+							}
+							else if (s1.IndexOf("grace") == 0)
+							{
+								Match SingleParam = FindSingleParam.Match(s1);
+								if (SingleParam.Success)
+								{
+									string GraceVal = SingleParam.Result("$1");
+									switch (GraceVal)
 									{
-										string[] Params = new string[8];
-										Match SetSlurMatch = FindSetSlurComplex1.Match(s1);
-										if (SetSlurMatch.Success)
+										case "grace":
+											GraceType = "grace";
+											break;
+										case "slash":
+											GraceType = "slashedGrace";
+											break;
+										case "acc":
+											GraceType = "acciaccatura";
+											break;
+										case "ap":
+											GraceType = "appoggiatura";
+											break;
+										default:
+											GraceType = "";
+											break;
+									}
+
+								}
+							}
+							else if (s1.IndexOf("setSlur") == 0)
+							{
+								if (s1.IndexOf("setSlurComplex") == 0)
+								{
+									string[] Params = new string[8];
+									Match SetSlurMatch = FindSetSlurComplex1.Match(s1);
+									if (SetSlurMatch.Success)
+									{
+										Params[0] = SetSlurMatch.Result("$2");
+										string OtherParams = SetSlurMatch.Result("$3");
+										MatchCollection Matches = FindSetSlurComplex2.Matches(OtherParams);
+										int Count = 0;
+										foreach (Match ParamMatch in Matches)
 										{
-											Params[0] = SetSlurMatch.Result("$2");
-											string OtherParams = SetSlurMatch.Result("$3");
-											MatchCollection Matches = FindSetSlurComplex2.Matches(OtherParams);
-											int Count = 0;
-											foreach (Match ParamMatch in Matches)
+											Count++;
+											Params[Count] = ParamMatch.Result("$2");
+										}
+										if (Count == 7)
+										{
+											Write("\\shapeSlur #'(");
+											for (int ParamLoop = 0; ParamLoop < 8; ParamLoop++)
 											{
-												Count++;
-												Params[Count] = ParamMatch.Result("$2");
+												Write(Params[ParamLoop].ToString() + " ");
 											}
-											if (Count == 7)
-											{
-												Write("\\shapeSlur #'(");
-												for (int ParamLoop = 0; ParamLoop < 8; ParamLoop++)
-												{
-													Write(Params[ParamLoop].ToString() + " ");
-												}
-												WriteLn(")");
-											}
-											else
-											{
-												WriteLn("  % Error");
-												WriteLn("#(ly:warning \"Error in parameter extraction for setSlurComplex command \")");
-											}
+											WriteLn(")");
 										}
 										else
 										{
@@ -1281,23 +1275,28 @@ namespace nwc2ly
 									}
 									else
 									{
-										Match SetSlurMatch = FindSetSlur.Match(s1);
-										if (SetSlurMatch.Success)
-										{
-											WriteLn("\\override Slur #'positions = #'(" + SetSlurMatch.Result("$2") + " . " + SetSlurMatch.Result("$4") + ")");
-										}
-										else
-										{
-											WriteLn("  % Error");
-											WriteLn("#(ly:warning \"Error in parameter extraction for setSlur command \")");
-										}
+										WriteLn("  % Error");
+										WriteLn("#(ly:warning \"Error in parameter extraction for setSlurComplex command \")");
 									}
 								}
-								else if (s1.IndexOf("dynCom") >= 0)
+								else
 								{
-									string DynCom = s1.Replace("dynCom", "");
-									OutDyn += DynCom;
+									Match SetSlurMatch = FindSetSlur.Match(s1);
+									if (SetSlurMatch.Success)
+									{
+										WriteLn("\\override Slur #'positions = #'(" + SetSlurMatch.Result("$2") + " . " + SetSlurMatch.Result("$4") + ")");
+									}
+									else
+									{
+										WriteLn("  % Error");
+										WriteLn("#(ly:warning \"Error in parameter extraction for setSlur command \")");
+									}
 								}
+							}
+							else if (s1.IndexOf("dynCom") >= 0)
+							{
+								string DynCom = s1.Replace("dynCom", "");
+								OutDyn += DynCom;
 							}
 						}
 					}
@@ -1537,31 +1536,26 @@ namespace nwc2ly
 
 		public static string GetPar(string ParName, string Line, bool All)
 		{
-			string result;
-			int i;
-			string s;
-			string Stop;
+			char[] DelimChars = { '|', ',' };
+
+			// Allow for pipe character in the command - it looks like this is always escaped
+			string LineCopy = Line;
+			LineCopy = LineCopy.Replace(@"\|", "PipeChar");
+
 			if (All)
 			{
-				Stop = "|";
+				Array.Resize(ref DelimChars, 1);
 			}
-			else
+			int ParEnd = LineCopy.IndexOf(ParName + ":");
+			string NewLine = "";
+			if (ParEnd > -1)
 			{
-				Stop = "|,";
+				ParEnd += ParName.Length + 1;
+				NewLine = LineCopy.Substring(ParEnd);
 			}
-			s = "";
-			i = Line.IndexOf(ParName + ':');
-			if (i > -1)
-			{
-				i = i + 1 + ParName.Length;
-				while ((i < Line.Length) && (!(Stop.IndexOf(Line[i]) >= 0)))
-				{
-					s = s + Line[i];
-					i = i + 1;
-				}
-			}
-			result = s;
-			return result;
+			string[] MyRes = NewLine.Split(DelimChars);
+			string RetVal = MyRes[0].Replace("PipeChar", "|");
+			return RetVal;
 		}
 
 		public static string GetPar(string ParName, string Line)
@@ -1643,22 +1637,30 @@ namespace nwc2ly
 			}
 			else
 			{
-				RetVal = @"s" + DurVal.ToString() + Dots;
+				RetVal = @"s" + DurVal.ToString() + Dots + @" \! ";
 			}
 			return RetVal;
 		}
 		public static void CheckHairCresc()
 		{
 			if (VoiceHidden) return;
-			CheckHairType("\\<", "Crescendo", "Diminuendo", ref bInHairCresc, ref bInHairDim);
-			CheckHairType("\\>", "Diminuendo", "Crescendo", ref bInHairDim, ref bInHairCresc);
+			if (bInHairCresc)
+			{
+				CheckHairType("\\<", "Crescendo", "Diminuendo", ref bInHairCresc);
+				CheckHairType("\\>", "Diminuendo", "Crescendo", ref bInHairDim);
+			}
+			else
+			{
+				CheckHairType("\\>", "Diminuendo", "Crescendo", ref bInHairDim);
+				CheckHairType("\\<", "Crescendo", "Diminuendo", ref bInHairCresc);
+			}
 		}
-		public static void CheckHairType(string Startstring, string ThisHair, string OtherHair, ref bool ThisAlready, ref bool OtherAlready)
+		public static void CheckHairType(string Startstring, string ThisHair, string OtherHair, ref bool ThisAlready)
 		{
 			Regex Spacers = new Regex("s[0-9]{1,3}[\\.]*");
 			Regex Dynamics = new Regex("[\\\\mfp]{2,4}");
 			Match LastSpacer;
-			Match PenSpacer;
+			Match PenultimateSpacer;
 
 			bool bThis = GetPar("Opts", Line, true).IndexOf(ThisHair) >= 0;
 			bool bOther = GetPar("Opts", Line, true).IndexOf(OtherHair) >= 0;
@@ -1701,15 +1703,15 @@ namespace nwc2ly
 					{
 						if (SpacerCount > 1)
 						{
-							PenSpacer = AllSpacers[SpacerCount - 2];
+							PenultimateSpacer = AllSpacers[SpacerCount - 2];
 
 							// The hairpin is now over, but we've written the next note already
 							// Need to add a \! to the _previous_ note, which should be
 							// sub-divided to get it the right length.
-							string PrevDur = PenSpacer.Value.ToString().Replace("s", "");
+							string PrevDur = PenultimateSpacer.Value.ToString().Replace("s", "");
 							string EndHair = CreateSpacers(PrevDur);
-							OutDyn = OutDyn.Remove(PenSpacer.Index, PenSpacer.Length);
-							OutDyn = OutDyn.Insert(PenSpacer.Index, EndHair);
+							OutDyn = OutDyn.Remove(PenultimateSpacer.Index, PenultimateSpacer.Length);
+							OutDyn = OutDyn.Insert(PenultimateSpacer.Index, EndHair);
 							ThisAlready = false;
 						}
 					}
@@ -2369,7 +2371,7 @@ namespace nwc2ly
 			{
 				int VertOffset = 0;
 				string NoteEquiv = "";
-				if (Line.IndexOf("Opts:VertOffset") != 0)
+				if (Line.IndexOf("Opts:VertOffset") > -1)
 				{
 					Match VertOffsetMatch = GetVertOffset.Match(Line);
 					if (VertOffsetMatch.Success)
