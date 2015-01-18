@@ -87,6 +87,7 @@ namespace nwc2ly
 		public static char[] Key = new char[7];
 		public static char[] BarKey = new char[7];
 		public static string Output = "";
+		public static string LyrNotes = "";
 		public static string Last = "";
 		public static string Line = "";
 		public static string NextLine = "";
@@ -104,6 +105,8 @@ namespace nwc2ly
 		public static int Code = 0;
 		public static bool Slur = false;
 		public static bool Tied = false;
+		public static bool NoteSlurred = false;
+		public static bool NoteTied = false;
 		public static bool Grace = false;
 		public static string Dyn = "";
 		public static string Chord = "";
@@ -174,13 +177,22 @@ namespace nwc2ly
 
 			string inputFile = "";
 			string outputFile = "";
+			string noteFile = "";
 			string DynamicsDirection = "";
 			bool AccChecked = false;
 			bool StaffAboveLayered = false;
 			bool autoBeam = false;
+			bool SkipLyr = false;
 
 			switch (args.Length)
 			{
+				case 8:
+					SkipLyr = bool.Parse(args[7]);
+					if (SkipLyr)
+					{
+						noteFile = args[1].Replace(".ly", ".notes.txt");
+					}
+					goto case 7;
 				case 7:
 					DynamicSpacing = int.Parse(args[6]);
 					goto case 6;
@@ -543,6 +555,8 @@ namespace nwc2ly
 								}
 								Dyn = Dyn + " \\" + GetPar("Style", Line, true);
 								Last = "";
+								bInHairCresc = false;
+								bInHairDim = false;
 							}
 						}
 						else if (Cmd == "TimeSig")
@@ -570,6 +584,10 @@ namespace nwc2ly
 						else if ((Cmd == "Note") || (Cmd == "Chord"))
 						{
 							WriteNotes();
+							if (SkipLyr)
+							{
+								DoLyricNotes();
+							}
 						}
 						else if (Cmd == "Rest")
 						{
@@ -664,7 +682,7 @@ namespace nwc2ly
 							}
 							else
 							{
-								NextText = "^\\markup{\\italic{ " + s1 + " }}" + NextText;
+								NextText = GetPosChar(Line) + "\\markup{\\italic{ " + s1 + " }}" + NextText;
 							}
 							Last = "";
 						}
@@ -758,8 +776,15 @@ namespace nwc2ly
 							}
 							else if (s1 == "Fine")
 							{
+								WriteLn(@"\once \override Score.RehearsalMark.break-visibility = #end-of-line-visible ");
 								WriteLn(@" \once \override Score.RehearsalMark #'self-alignment-X = #RIGHT");
 								WriteLn("\\mark \\markup { \"Fine\" }");
+							}
+							else if (s1 == "DCalFine")
+							{
+								WriteLn(@"\once \override Score.RehearsalMark.break-visibility = #end-of-line-visible ");
+								WriteLn(@" \once \override Score.RehearsalMark #'self-alignment-X = #RIGHT");
+								WriteLn("\\mark \\markup { \"D.C. al Fine\" }");
 							}
 							else
 							{
@@ -903,8 +928,8 @@ namespace nwc2ly
 										WriteLn(OssiaName[0] + " = { ");
 										WriteLn("\\clef \"" + CurClef + "\"");
 										WriteLn(KeySig);
-										WriteLn(@"\override TextScript #'Y-offset = #-5");
-										WriteLn(@"\once \override TextScript #'outside-staff-priority = #999"); // Ensures other text is next to stave
+										//WriteLn(@"\override TextScript #'Y-offset = #-5");
+										//WriteLn(@"\once \override TextScript #'outside-staff-priority = #999"); // Ensures other text is next to stave
 										InOssia = true;
 										if (InputList[0].IndexOf("|Text|Text:") == 0)
 										{
@@ -915,12 +940,7 @@ namespace nwc2ly
 											if (LocalString.Length > 0)
 											{
 												LocalString = LocalString.Replace("\"", "");
-												AddedText += "_\" \" ^\\markup { \\column { \\vspace #1 \\italic \"" + LocalString + "\" } } ";
 											}
-										}
-										else
-										{
-											AddedText += "_\" \" ^\\markup { \\column { \\vspace #1 \" \" } } ";
 										}
 									}
 									else
@@ -937,6 +957,7 @@ namespace nwc2ly
 							if (s1.IndexOf("##") == 0)
 							{
 								if (s1.IndexOf(@"##\mark") == 0)
+								{
 									if (s1.IndexOf(@"##\markup") == -1)
 									{
 										{ // Special case needed to reset mark position - see fermata on barline
@@ -944,7 +965,12 @@ namespace nwc2ly
 											WriteLn(@" \revert Score.RehearsalMark #'direction");
 										}
 									}
+								}
 								s1 = s1.Substring(2);
+								if (s1.IndexOf("shiftDurations") > -1)
+								{
+									OutDyn += " " + s1+ " ";
+								}
 								Write(" " + s1 + " ");
 							}
 							else if (s1.IndexOf("!!") == 0)
@@ -1372,10 +1398,18 @@ namespace nwc2ly
 					FileInfo LyOutFile = new FileInfo(outputFile);
 					string DynFile = LyOutFile.DirectoryName + "\\" + LyOutFile.Name.Replace(LyOutFile.Extension, "Dyn.ly");
 					OutFile = new StreamWriter(DynFile, false);
-					OutDyn += @" \!"; //Don't think it can harm to add terminator at end.
+					OutDyn += @"<> \!"; //Don't think it can harm to add terminator at end.
 					OutFile.Write(OutDyn);
 					OutFile.Flush();
 					OutFile.Close();
+				}
+				if (SkipLyr)
+				{
+					OutFile = new StreamWriter(noteFile, false);
+					OutFile.Write(LyrNotes);
+					OutFile.Flush();
+					OutFile.Close();
+					LyrNotes = "";
 				}
 			}
 #if DEBUG
@@ -2858,7 +2892,16 @@ namespace nwc2ly
 				return "";
 			}
 		}
-
+		private static void DoLyricNotes()
+		{
+			if (LyrNotes.Length > 0) LyrNotes += ",";
+			if (NoteTied) LyrNotes += "TieSkip";
+			else if (NoteSlurred) LyrNotes += "SlurSkip";
+			else if (Line.IndexOf("Lyric=Never") > -1) LyrNotes += "SkipSkip";
+			else LyrNotes += "Note";
+			if (Line.IndexOf("^") > -1) NoteTied = true; else NoteTied = false;
+			if (Line.IndexOf("Slur") > -1) NoteSlurred = true; else NoteSlurred = false;
+		}
 	}
 	public class NoteInfo
 	{
