@@ -816,6 +816,23 @@ namespace nwc2ly
 						Last = "";
 						ClearBarKeys();
 					}
+					else if (Cmd == "Clef")
+					{
+						// Ditto clefs
+						s1 = GetPar("Type", Line).ToLower();
+						s2 = GetPar("OctaveShift", Line);
+						if (s2 == "Octave Up")
+						{
+							s1 = s1 + "^8";
+						}
+						if (s2 == "Octave Down")
+						{
+							s1 = s1 + "_8";
+						}
+						CurClef = s1;
+						WriteLn(" \\clef \"" + s1 + "\"");
+						Last = "";
+					}
 					else if (Cmd == "TimeSig")
 					{
 						// Ditto Time Signatures
@@ -1034,11 +1051,12 @@ namespace nwc2ly
 								for (int l = 0; l < OssiaName.Length; l++)
 								{
 									string FlagStaff = "";
-									if (l == 0) FlagStaff = " Staff ";
-									WriteLn("%" + OssiaName[l] + "Music");
+									if (l == 0) FlagStaff = ThisStave;
+									// These next two lines write markers into the main stave music where the ossia music and lyrics will be inserted
+									WriteLn("%" + OssiaName[l] + "Music"); 
 									WriteLn("%" + OssiaName[l] + "Lyrics");
 									int FileStartPos = Output.IndexOf("%StartMarker");
-									Output = Output.Insert(FileStartPos, "%OssiaInclude " + OssiaName[l] + FlagStaff + "\r\n");
+									Output = Output.Insert(FileStartPos, "%OssiaInclude " + OssiaName[l] + " " + FlagStaff + "\r\n");
 									if (l == 0) l++; //Skip stave name
 								}
 								WriteLn(">>");
