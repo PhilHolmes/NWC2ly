@@ -830,7 +830,6 @@ namespace nwc2ly
 							s1 = s1 + "_8";
 						}
 						CurClef = s1;
-						WriteLn(" \\clef \"" + s1 + "\"");
 						Last = "";
 					}
 					else if (Cmd == "TimeSig")
