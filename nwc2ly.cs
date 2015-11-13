@@ -136,6 +136,7 @@ namespace nwc2ly
 		private static Regex FindHiddenNoteHead;
 		private static Regex FindDiamondNoteHead;
 		private static Regex FindXNoteHead;
+		private static Regex FindTiedSemis;
 		private static Regex GetVertOffset;
 		private static int TremValue = 0;
 		private static bool TremSingle = false;
@@ -241,6 +242,7 @@ namespace nwc2ly
 			FindHiddenNoteHead = new Regex(@"[0-9]z");  // defined as a static up top
 			FindDiamondNoteHead = new Regex(@"[0-9]X");  // defined as a static up top
 			FindXNoteHead = new Regex(@"[0-9]x");  // defined as a static up top
+			FindTiedSemis = new Regex(@"([a-g|is|es]*)([,']*)1([\.]{0,1})[\s]*~[\s]*([a-g|is|es]*)[,']*1(\.){0,1}");
 			GetVertOffset = new Regex(@"(Opts:VertOffset=)([0-9/-]+)");  // ditto
 			Regex FindNote = new Regex(@"([a-g][ies]*[\',]*)([1|2|4|8|32][6]?)([\.]?)((\s?\^?_?\s?(\\[a-zA-Z]+))*)");
 
@@ -910,6 +912,8 @@ namespace nwc2ly
 											SlurBeam += " ] ";
 											Output = Output.Remove(LastNotePos + Output.Substring(LastNotePos).IndexOf(']'), 1);
 										}
+										/*
+										Not needed after fix in 2.19.16
 										string BarSuffix = "";
 										if (LastNoteSuffix.IndexOf("\\bar") > -1)
 										{
@@ -917,7 +921,7 @@ namespace nwc2ly
 											BarSuffix = " \\bar";
 										}
 										Output = Output.Remove(LastNotePos, LastNoteLen);
-										Output = Output.Insert(LastNotePos, LastNoteVal + LastNoteDur + LastNoteDot + @"*1/2 " + SlurBeam + LastNoteSuffix + @" \once \override NoteColumn #'ignore-collision = ##t \hideNotes " + LastNoteVal + LastNoteDur * 2 + LastNoteDot + @" \unHideNotes " + BarSuffix);
+										Output = Output.Insert(LastNotePos, LastNoteVal + LastNoteDur + LastNoteDot + @"*1/2 " + SlurBeam + LastNoteSuffix + @" \once \override NoteColumn #'ignore-collision = ##t \hideNotes " + LastNoteVal + LastNoteDur * 2 + LastNoteDot + @" \unHideNotes " + BarSuffix); */
 									}
 									InOssia = false;
 									CheckHairCresc();
@@ -1398,6 +1402,32 @@ namespace nwc2ly
 			if (!OssiaStave)
 			{
 				WriteLn("}");
+			}
+
+			//This is a horrible hack to prevent multiple "whole note" rests is a single (long)
+			// bar from being written out twice: once as an r1 and once as R1*N/M
+			string[] BarNotes = Output.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+			Output = "";
+			for (int i = 0; i < BarNotes.Length; i++)
+			{
+				if (BarNotes[i].IndexOf("R1*") > 0)
+				{
+					while (BarNotes[i].IndexOf("r1 ") > -1) BarNotes[i] = BarNotes[i].Replace("r1", "");
+				}
+				BarNotes[i] = BarNotes[i].Trim();
+				WriteLn(BarNotes[i]);
+			}
+
+			BarNotes = OutDyn.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+			OutDyn = "";
+			for (int i = 0; i < BarNotes.Length; i++)
+			{
+				if (BarNotes[i].IndexOf("R1*") > 0)
+				{
+					while (BarNotes[i].IndexOf("s1 ") > -1) BarNotes[i] = BarNotes[i].Replace("s1", "");
+				}
+				BarNotes[i] = BarNotes[i].Trim();
+				OutDyn += BarNotes[i] + "\r\n";
 			}
 
 			if (args.Length > 0)
@@ -2302,6 +2332,18 @@ namespace nwc2ly
 				if (CountBars)
 				{
 					OutDyn += " } ";
+				}
+			}
+			Match TiedSemiMatch = FindTiedSemis.Match(Output);
+			if (TiedSemiMatch.Success)
+			{
+				Output = FindTiedSemis.Replace(Output, TiedSemiMatch.Result("$1" + "$2" + "\\breve" + "$3"));
+				NoteTied = false;
+				// Now remove one entry in the Lyrnotes list: we're deleting a "note" here by combining 2 semi breves into a breve.
+				int LastComma = LyrNotes.LastIndexOf(',');
+				if (LastComma > -1)
+				{
+					LyrNotes = LyrNotes.Substring(0, LastComma);
 				}
 			}
 		}
