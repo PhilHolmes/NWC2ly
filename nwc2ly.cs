@@ -160,6 +160,8 @@ namespace nwc2ly
 		[STAThread]
 		public static void Main(string[] args)
 		{
+			bool hideDyn = false;
+
 			Output = "";
 			NextText = "";
 			CountBars = true;
@@ -1129,6 +1131,10 @@ namespace nwc2ly
 							{
 								WriteLn("\\set melismaBusyProperties = #'(melismaBusy slurMelismaBusy tieMelismaBusy completionBusy)");
 							}
+							else if (s1.IndexOf("hideDyn") == 0)
+							{
+								hideDyn = true;
+							}
 							else if (s1.IndexOf("accidentalsOn") == 0)
 							{
 								ShowAccidentals = true;
@@ -1445,8 +1451,11 @@ namespace nwc2ly
 					FileInfo LyOutFile = new FileInfo(outputFile);
 					string DynFile = LyOutFile.DirectoryName + "\\" + LyOutFile.Name.Replace(LyOutFile.Extension, "Dyn.ly");
 					OutFile = new StreamWriter(DynFile, false);
-					OutDyn += @"<> \!"; //Don't think it can harm to add terminator at end.
-					OutFile.Write(OutDyn);
+					if (!hideDyn)
+					{
+						OutDyn += @"<> \!"; //Don't think it can harm to add terminator at end.
+						OutFile.Write(OutDyn);
+					}
 					OutFile.Flush();
 					OutFile.Close();
 				}
