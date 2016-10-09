@@ -2245,6 +2245,10 @@ namespace nwc2ly
 				{
 					Write("--");
 				}
+				if (Line.IndexOf("Marcato") >= 0)
+				{
+					Write("-^");
+				}
 				/*if (HideNote)
 				{
 					Write("\\unHideNotes ");
