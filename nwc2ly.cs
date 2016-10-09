@@ -2942,6 +2942,16 @@ namespace nwc2ly
 				s1 = "4";
 			}
 			string Text = GetPar("Text", Line, true);
+			Text = Text.Replace("\\]", "\\");
+			if (Text.IndexOf("\\markup") == 1)
+			{
+				int StartQuote = Text.IndexOf("\"");
+				int EndQuote = Text.LastIndexOf("\"");
+				if (EndQuote>-1 && StartQuote>-1)
+				{
+					Text = Text.Substring(StartQuote + 1, EndQuote - (StartQuote + 1));
+				}
+			}
 			if (Text != "")
 			{
 				WriteLn(" \\tempo " + Text + s1 + '=' + GetPar("Tempo", Line));
